@@ -18,9 +18,9 @@ The DLR TAU code is a fluid solver. See description_ for more info.
 
 Python packages:
 ##################
-- numpy >= version 1.6.1
-- matplotlib >= version 0.99.1
-- Tkinter >= revision 81008
+- numpy
+- matplotlib
+- Tkinter
     
 .. Note:: 
     
