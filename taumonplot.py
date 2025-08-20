@@ -4,18 +4,14 @@
 #--------------------------------------------------------------------------
 #
 #
-#~ import os
-subdirectory = './../' 
-subdirectory = './'
-#~ subdirectory = os.getcwd()
-#subdirectory = './transient_512/taumon/'
+subdirectory = './example/'
 name_prefix = 'fluid.solution' # name of monitor file, without the ending '.monitor.tmp.dat', '.monitor.pval.dat', '.monitor.tmp.unsteady.dat', '.monitor.pval.unsteady.dat'
 #
 x_variable_list = ['Inner-iter']
 #~ x_variable_list = ['thistime']
-y_variable_list = ['Residual',\
-                            'C-lift',\
-                            'C-drag' ]
+y_variable_list = [ 'Residual',
+                    'C-lift',
+                    'C-drag' ]
 #
 #--------------------------------------------------------------------------
 # Copyright (c) 2012, Institute of Aircraft Design and Lightweight Structures (IFL),
@@ -50,6 +46,7 @@ y_variable_list = ['Residual',\
 #--------------------------------------------------------------------------
 #
 # This program is written in Python <= 2.7 under Linux-Ubuntu 10.04, it has been tested under MS Windows 7
+# This program was updated to support Python 3.X
 #
 # Author: Kay Sommerwerk
 # e-mail: k.sommerwerk@tu-braunschweig.de
@@ -208,7 +205,7 @@ y_variable_list = ['Residual',\
 data_line = 24                       # line where data values start in monitoring file, typically line 25 for TAU monitoring file , sometimes 24 after restarts
 title_line = 23                         # line with variable names
 #
-# startup values to diplay
+# startup values to display
 
 check_iter_numbers = True	# Enable to check ascending order of iteration numbers
 #
@@ -219,27 +216,32 @@ formats = ['png']           # emf, eps, jpeg, jpg, pdf, png, ps, raw, rgba, svg,
 #
 ############################### MODULES
 # system
-import os,sys,time
+import os
+import sys
+import time
+from typing import Literal
+from pathlib import Path
 # numpy > 1.6.1
 import numpy as np
-from numpy.lib._iotools import _is_string_like
+def is_string_like(obj):
+    """Return True if obj is string-like (filename/path)."""
+    return isinstance(obj, (str, bytes, Path, np.str_, np.bytes_))
 # matplotlib > 0.99.1
 import pylab
 from matplotlib.font_manager import FontProperties
-from matplotlib.widgets import Button
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
 # TKinter gui
-import Tkinter as Tk
-import tkMessageBox
-import tkFileDialog
+import tkinter as tk
+import tkinter.messagebox as tkMessageBox
+import tkinter.filedialog as tkFileDialog
 ############################### MODULES END
 #
 ############################### TERMINAL or DIRECT startup
 if len(sys.argv) > 1:
     # terminal input with path/filename    
     filepath = sys.argv[1]
-    print filepath
+    print(filepath)
     if '/' in filepath:
         #~ path in filename
         split_path = filepath.split('/')
@@ -263,15 +265,25 @@ else:
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
 #
 
-class Plotcreator:
-    ''' 
+class PlotCreator:
+    """
     Class to create a matplotlib figure plot
-    '''
+    """
     #
-    def __init__(self, subplot, subdirectory, name_prefix, data_line, title_line, x_variable_list, y_variable_list, check_iter_numbers, save_to_file=False):
-        ''' 
+    def __init__(self,
+                 subplot,
+                 subdirectory,
+                 name_prefix,
+                 data_line,
+                 title_line,
+                 x_variable_list,
+                 y_variable_list,
+                 check_iter_numbers,
+                 save_to_file=False,
+                 ):
+        """
         Create a matplotlib figure plot
-        
+
         :Parameters:
             subplot : matplotlib subplot instance
                 the figure subplot
@@ -279,25 +291,31 @@ class Plotcreator:
                 directory containing monitoring data, absolute or relative
             name_prefix : string
                 name prefix of monitoring file
-            data_line : integer 
+            data_line : integer
                 line number where data starts
-            title_line : integer 
+            title_line : integer
                 line number of variable names
-            x_variable_list : 
+            x_variable_list :
                 list of strings for x-variable
-            y_variable_list : list of strings 
+            y_variable_list : list of strings
                 list of strings for y-variable
-            check_iter_numbers : bool 
+            check_iter_numbers : bool
                 check ascending order of iteration numbers
             save_to_file : bool
                 switch to save file (deprecated)
-        '''
+        """
         #
         self.data_line = data_line
         self.title_line = title_line
         self.x_variable_list = x_variable_list
         self.y_variable_list = y_variable_list
         self.check_iter_numbers = check_iter_numbers
+        #
+        self.header = None
+        self.value_dict = None
+        self.available_variables = None
+        self.min_entry_val = None
+        self.max_entry_val = None
         #
         self.set_title = True
         self.x_scale_log = False
@@ -325,7 +343,7 @@ class Plotcreator:
         self.auto_update_time = 15  #in seconds
         #
         self.table_entry_val = int( ( self.max_entry_val - self.min_entry_val ) / 50 )
-        #        
+        #
         #
         #
         self.suplot_left = .125
@@ -333,32 +351,50 @@ class Plotcreator:
         self.suplot_top = .9
         self.suplot_bottom = .125
         #        
-        self.plot_options_dict = {}
-        self.plot_options_dict["X-Var"] = x_variable_list[0]
+        self.plot_options_dict = {"X-Var": x_variable_list[0],
+                                  "ticker_size": 'medium',
+                                  "legend_size": 'large',
+                                  "xaxis_size": 'large',
+                                  "yaxis_size": 'large',
+                                  }
         #
-        self.plot_options_dict["ticker_size"] = 'medium' 
-        self.plot_options_dict["legend_size"] = 'large' 
-        self.plot_options_dict["xaxis_size"] = 'large' 
-        self.plot_options_dict["yaxis_size"] = 'large' 
-        #        
-        #plot
+
+        # COLORING
+        # http://scipy-lectures.github.io/intro/matplotlib/matplotlib.html#line-properties
+        #
+        self.plot_line_color_color = ['b','g','r','c','m','y']     # gray scale colors, hexmap colors, RGB tuples possible
+        self.plot_alpha = list(np.linspace(0.,1.,21)[::-1])
+        self.plot_line_color_grey = list(map(str,np.linspace(0.,1.,21)[::-1]))
+        self.plot_line_color = iter(self.plot_line_color_color+self.plot_line_color_grey)
+        self.plot_line_styles = ['-','--','..','-.','.',',','o','^','v','<','>','s','+','x','d','1','2','3','4','h','p','|','S','H']
+        self.plot_line_widths = np.arange(1,13)
+        self.plot_marker_styles = ['o','h','^','v','<','>','_','1','2','3','4','8','p','|','d',',','+','s','*','l','x','D','H','.','']
+        self.plot_marker_styles_iterator = iter(self.plot_marker_styles)
+        self.plot_marker_size = np.arange(1,13)
+        self.plot_marker_every = [1,10,100,1000]
+        #
+        # plot
         self.plot_monitor_file( subplot, data_line, title_line, x_variable_list, y_variable_list, save_to_file)
+        #
         return
     #
-    def get_log_name(self, subdirectory, name_prefix):
-        ''' 
+    def get_log_name(self,
+                     subdirectory: str,
+                     name_prefix: str,
+                     ):
+        """
         Returns the logfile name or error when file not found
-        
+
         :Parameters:
             subdirectory : string
                 directory containing monitoring data, absolute or relative
             name_prefix : string
                 name prefix of monitoring file
-        
-        '''
+
+        """
         #
         log_name = None
-        if os.path.isfile(subdirectory+name_prefix+'.monitor.tmp.dat'):
+        if os.path.isfile(subdirectory + name_prefix+'.monitor.tmp.dat'):
             self.subdirectory = subdirectory
             self.unsteady = False
             log_name = name_prefix + '.monitor.tmp.dat'
@@ -387,7 +423,7 @@ class Plotcreator:
             #
         #
         if log_name is None:
-            print "File with prefix '",subdirectory+name_prefix,"' not available. Please choose a file..."
+            print("File with prefix '",subdirectory+name_prefix,"' not available. Please choose a file...")
             file_path = tkFileDialog.askopenfilename(initialdir=subdirectory,defaultextension=".dat",filetypes=[("data files", ".dat"),("all files", ".*")])            
             self.filename = file_path.split('/')[-1]
             self.subdirectory = '/'.join(file_path.split('/')[:-1])+'/'
@@ -397,75 +433,64 @@ class Plotcreator:
         return
     #
     def get_variables(self):
-        ''' 
+        """
         Returns a list of available variables and the min and max value of the x variable from the TAU monitoring file
-        
-        :Parameters:    
+
+        :Parameters:
             none
-        '''
-        #        
-        #~ print 'get_vars'
-        
+        """
         if os.path.isfile(self.subdirectory+self.filename):
-            self.header, self.value_dict = ascii_read(self.subdirectory+self.filename , \
-                                                                            self.data_line, \
-                                                                            self.title_line, \
-                                                                            title_line_junk='#', \
-                                                                            column_titles=True, \
-                                                                            return_header=True, \
-                                                                            check_iter_numbers=self.check_iter_numbers)
+            self.header, self.value_dict = ascii_read(self.subdirectory+self.filename ,
+                                                        self.data_line,
+                                                        self.title_line,
+                                                        title_line_junk='#',
+                                                        column_titles=True,
+                                                        return_header=True,
+                                                        check_iter_numbers=self.check_iter_numbers)
             #            
-            self.available_variables = self.value_dict.keys()
+            self.available_variables = list(self.value_dict.keys())
             #
             self.min_entry_val = min(self.value_dict['"'+self.x_variable_list[0]+'"'])
             self.max_entry_val = max(self.value_dict['"'+self.x_variable_list[0]+'"'])
             
             #~ print "self.min_entry_val",self.min_entry_val
             #~ print "self.max_entry_val",self.max_entry_val
-            #~ s
             return 0
         else:
-            # return because file notexistent anymore
+            # return because file nonexistent anymore
             return -1                  
         
     #
-    def plot_monitor_file(self, subplot, data_line = 1, title_line=data_line-1, x_variable_list = ['Inner-iter'] , y_variable_list = ['Residual'], save_to_file = False):
-        ''' 
-        Uses read data and adds it to the subplot. 
-        
+    def plot_monitor_file(self,
+                          subplot,
+                          data_line: int = 1,
+                          title_line: int = data_line-1,
+                          x_variable_list: list = ('Inner-iter',),
+                          y_variable_list: list = ('Residual',),
+                          save_to_file = False):
+        """
+        Uses read data and adds it to the subplot.
+
         It additionally creates image files when save_to_file is set to True (obsolete) .
-        
-        :Parameters:    
-            
+
+        :Parameters:
+
             subplot : matplotlib subplot instance
-                the figure subplot            
-            data_line : integer 
+                the figure subplot
+            data_line : integer
                 line number where data starts
-            title_line : integer 
+            title_line : integer
                 line number of variable names
-            x_variable_list : 
+            x_variable_list :
                 list of strings for x-variable
-            y_variable_list : list of strings 
-                list of strings for y-variable            
+            y_variable_list : list of strings
+                list of strings for y-variable
             save_to_file : bool
                 switch to save file (deprecated)
-                
-            
-        '''
+
+
+        """
         self.plot_options_dict["X-Var"] = x_variable_list[0]
-        # COLORING
-        # http://scipy-lectures.github.io/intro/matplotlib/matplotlib.html#line-properties
-        #
-        self.plot_line_color_color = ['b','g','r','c','m','y']     # gray scale colors, hexmap colors, RGB tuples possible
-        self.plot_alpha = list(np.linspace(0.,1.,21)[::-1])
-        self.plot_line_color_grey = list(map(str,np.linspace(0.,1.,21)[::-1]))
-        self.plot_line_color = iter(self.plot_line_color_color+self.plot_line_color_grey)        
-        self.plot_line_styles = ['-','--','..','-.','.',',','o','^','v','<','>','s','+','x','d','1','2','3','4','h','p','|','S','H']
-        self.plot_line_widths = np.arange(1,13)
-        self.plot_marker_styles = ['o','h','^','v','<','>','_','1','2','3','4','8','p','|','d',',','+','s','*','l','x','D','H','.','']
-        self.plot_marker_styles_iterator = iter(self.plot_marker_styles)
-        self.plot_marker_size = np.arange(1,13)
-        self.plot_marker_every = [1,10,100,1000]
         #
         # ######################################
         #
@@ -501,12 +526,8 @@ class Plotcreator:
         for variable in range(len(x_variable_list_plot)):
             x_variable_list_plot[variable] = '"'+x_variable_list_plot[variable]+'"'
             #
-            
-            
         #
-        if x_variable_list_plot[0] in value_dict:
-            
-            
+        if value_dict is not None and x_variable_list_plot[0] in value_dict:
             try:
                 min_plot_index = np.where(value_dict[x_variable_list_plot[0]]==self.min_entry_val_disp)[0][0]
             except:
@@ -519,9 +540,7 @@ class Plotcreator:
             if min_plot_index>max_plot_index:
                 min_plot_index=0
                 max_plot_index = len(value_dict[x_variable_list_plot[0]])-1
-                
-                
-            
+
             #~ raise  "find out where min and max entry value start and stop"
             #~ x = value_dict[x_variable_list_plot[0]][self.min_entry_val_disp-value_dict[x_variable_list_plot[0]][0]:self.max_entry_val_disp-value_dict[x_variable_list_plot[0]][0]]
             
@@ -736,18 +755,18 @@ class Plotcreator:
             pylab.xlabel(x_variable_list[0].strip('"'), size = 'large' )
             pylab.ylabel(', '.join(y_variable_list).replace('"',''), size = 'large' )
             pylab.title(header[0].split(':')[1])                                     
-            pylab.legend(y_variable_list, \
-                                loc = 'best', \
-                                #loc = 'lower left', \
-                                #~ bbox_to_anchor=(1,1), \
-                                prop = fontP, \
-                                numpoints = 4, \
-                                scatterpoints = 4, \
-                                markerscale = None, \
-                                fancybox= False,\
-                                shadow = False, \
-                                ncol = 1, \
-                                mode = None, \
+            pylab.legend(y_variable_list,
+                                loc = 'best',
+                                #loc = 'lower left',
+                                #~ bbox_to_anchor=(1,1),
+                                prop = fontP,
+                                numpoints = 4,
+                                scatterpoints = 4,
+                                markerscale = None,
+                                fancybox= False,
+                                shadow = False,
+                                ncol = 1,
+                                mode = None,
                                 title = None
                                 )
             #
@@ -828,16 +847,16 @@ class Plotcreator:
             
             
             
-            leg = subplot.legend(label_plot_list, \
-                                    loc = 'best', \
-                                    prop = fontP, \
-                                    numpoints = 4, \
-                                    scatterpoints = 4, \
-                                    markerscale = None, \
-                                    fancybox = False,\
-                                    shadow = False, \
-                                    ncol = int(np.ceil((len(row_labels)/4.0))), \
-                                    mode = None, \
+            leg = subplot.legend(label_plot_list,
+                                    loc = 'best',
+                                    prop = fontP,
+                                    numpoints = 4,
+                                    scatterpoints = 4,
+                                    markerscale = None,
+                                    fancybox = False,
+                                    shadow = False,
+                                    ncol = int(np.ceil((len(row_labels)/4.0))),
+                                    mode = None,
                                     title = None
                                     )
             #
@@ -909,7 +928,7 @@ class Plotcreator:
             #
         #
         #~ save to file
-        '''
+        """
         if save_to_file:
             for format in formats:
                 #
@@ -936,42 +955,42 @@ class Plotcreator:
                 #
             pylab.close()
             #
-        '''
+        """
         #
         #~ print ' - Function plot_monitor_file exited successfully --------------------- '
         #
     #
     def replot(self, subplot, data_line, title_line, x_variable_list, y_variable_list, save_to_file):
-        ''' 
+        """
         Executes plot_monitor_file method
-        
+
         :Parameters:
             subplot : matplotlib subplot instance
-                the figure subplot           
-            data_line : integer 
+                the figure subplot
+            data_line : integer
                 line number where data starts
-            title_line : integer 
+            title_line : integer
                 line number of variable names
-            x_variable_list : 
+            x_variable_list :
                 list of strings for x-variable
-            y_variable_list : list of strings 
-                list of strings for y-variable            
+            y_variable_list : list of strings
+                list of strings for y-variable
             save_to_file : bool
                 switch to save file (deprecated)
-                
-        '''
+
+        """
         #
         self.plot_monitor_file(subplot, data_line, title_line, x_variable_list, y_variable_list,save_to_file)
         #
     #
     def add_TAU_status(self,fig):
-        ''' 
+        """
         Adds the current TAU solver status to the canvas.
-        
-        :Parameters:    
+
+        :Parameters:
             fig - matplotlib figure instance
                 the figure
-        '''
+        """
         #
         if self.filename.split('.')[-2] == 'pval':
             status_text = 'status: run completed'            
@@ -1003,33 +1022,41 @@ class Plotcreator:
 # ##########################################################################################################
 #
 #
-def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,y_variable_list,check_iter_numbers,save_to_file = False):
-    '''     
+def create_plot(subdirectory,
+                name_prefix,
+                data_line,
+                title_line,
+                x_variable_list,
+                y_variable_list,
+                check_iter_numbers,
+                save_to_file = False
+                ):
+    """
     Creates a Tkinter GUI for TAU monitoring file data
-    
-    :Parameters:            
+
+    :Parameters:
             subdirectory : string
                 directory containing monitoring data, absolute or relative
             name_prefix : string
                 name prefix of monitoring file
-            data_line : integer 
+            data_line : integer
                 line number where data starts
-            title_line : integer 
+            title_line : integer
                 line number of variable names
-            x_variable_list : 
+            x_variable_list :
                 list of strings for x-variable
-            y_variable_list : list of strings 
+            y_variable_list : list of strings
                 list of strings for y-variable
-            check_iter_numbers : bool 
+            check_iter_numbers : bool
                 check ascending order of iteration numbers
             save_to_file : bool
                 switch to save file (deprecated)
-                
-      
-    '''
+
+
+    """
     #
     #~ create tk instance
-    root = Tk.Tk()
+    root = tk.Tk()
     root.option_add("*font", ("Arial", 8, "normal"))
     #~ root.configure(background='white')
     #~ root.minsize(width=1000,height=800)
@@ -1044,32 +1071,43 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
       
     #
     #~ create plot   
-    Plot = Plotcreator(subplot,subdirectory,name_prefix,data_line, title_line,x_variable_list,y_variable_list,check_iter_numbers,save_to_file)
-    Plot.add_TAU_status(fig)    
-    Plot.fig = fig
-    Plot.fig.subplots_adjust(bottom=float(Plot.suplot_bottom), left=float(Plot.suplot_left), right=float(Plot.suplot_right), top=float(Plot.suplot_top) )
+    plot_creator = PlotCreator(subplot,
+                               subdirectory,
+                               name_prefix,
+                               data_line,
+                               title_line,
+                               x_variable_list,
+                               y_variable_list,
+                               check_iter_numbers,
+                               save_to_file)
+    plot_creator.add_TAU_status(fig)
+    plot_creator.fig = fig
+    plot_creator.fig.subplots_adjust(bottom=float(plot_creator.suplot_bottom),
+                                     left=float(plot_creator.suplot_left),
+                                     right=float(plot_creator.suplot_right),
+                                     top=float(plot_creator.suplot_top) )
     
-    #~ available_variables, Plot.min_entry_val, Plot.max_entry_val = get_variables(Plot,Plot.subdirectory, Plot.filename, data_line, title_line, x_variable_list)
-    available_variables = Plot.available_variables
+    #~ available_variables, plot_creator.min_entry_val, plot_creator.max_entry_val = get_variables(plot_creator,plot_creator.subdirectory, plot_creator.filename, data_line, title_line, x_variable_list)
+    available_variables = plot_creator.available_variables
     #
     #~ create canvas
     canvas = FigureCanvasTkAgg(fig, master=root)
-    canvas.show()
-    canvas.get_tk_widget().pack(side=Tk.TOP, fill=Tk.BOTH, expand=1)
+    canvas.draw()
+    canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
     #
     #~ create toolbar
-    toolbar = NavigationToolbar2TkAgg( canvas, root )
+    toolbar = NavigationToolbar2Tk( canvas, root )
     toolbar.update()
-    canvas._tkcanvas.pack(side=Tk.TOP, fill=Tk.BOTH, expand=1)
+    canvas._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
     #
        
     #
     #
     #~ toolbar functions and buttons
     def _quit():
-        ''' 
+        """ 
         Button command to close TK gui
-        '''
+        """
         #
         if tkMessageBox.askokcancel('Quit?' , 'Do you want to quit TAU monitoring plot script?' ):
             root.quit()                # stops mainloop
@@ -1081,9 +1119,9 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
         #
     #
     def _help():
-        ''' 
+        """ 
         Button command to open help window
-        '''
+        """
         #
         help_window.deiconify()
         #
@@ -1091,11 +1129,11 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
     def _save_help():
         help_window.withdraw()
     #
-    help_window = Tk.Toplevel(root)
-    myLabel = Tk.Label(help_window, text='TAU plot monitoring file data (taumonplot) - Help')
+    help_window = tk.Toplevel(root)
+    myLabel = tk.Label(help_window, text='TAU plot monitoring file data (taumonplot) - Help')
     myLabel.pack()
     #
-    help_text = Tk.Text(help_window)
+    help_text = tk.Text(help_window)
     #
     help_file_text = """ 
     #--------------------------------------------------------------------------
@@ -1192,14 +1230,14 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
     #---------------------------------------------------------------------------
     """
     #
-    help_text.insert(Tk.INSERT,help_file_text)
+    help_text.insert(tk.INSERT, help_file_text)
     help_text.config(width=100)
     help_text.configure( state= "disabled" )
-    scrollbar1 = Tk.Scrollbar(help_window)
+    scrollbar1 = tk.Scrollbar(help_window)
     #~ scrollbar2 = Tk.Scrollbar(help_window)
-    scrollbar1.pack(side=Tk.RIGHT, fill=Tk.Y)
+    scrollbar1.pack(side=tk.RIGHT, fill=tk.Y)
     #~ scrollbar2.pack(side=Tk.BOTTOM, fill=Tk.X)
-    help_text.pack(side=Tk.LEFT, fill=Tk.Y)
+    help_text.pack(side=tk.LEFT, fill=tk.Y)
     #~ help_text.pack(side=Tk.BOTTOM, fill=Tk.X)
     scrollbar1.config(command=help_text.yview)
     #~ scrollbar2.config(command=help_text.xview)
@@ -1214,9 +1252,9 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
     #file not available pop up window
     #
     def _fileAvail():
-        ''' 
+        """ 
         Command to open file not available window
-        '''
+        """
         #
         fileAvail_window.deiconify()
         #
@@ -1225,12 +1263,12 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
         fileAvail_window.withdraw()
     #
     #
-    fileAvail_window = Tk.Toplevel(root)
+    fileAvail_window = tk.Toplevel(root)
     fileAvail_window.config(width=80)   #,height=50)
-    top_frame_fileAvail_window = Tk.Frame(fileAvail_window, bd=1, relief=Tk.SUNKEN)
-    fileAvail_text = '  File not found:\n  '+ Plot.subdirectory + Plot.filename +'\n  Probably TAU finished and renamed the file to pval.dat\n  Press "Load" to load another file. Press "Cancel" to return without change.'
+    top_frame_fileAvail_window = tk.Frame(fileAvail_window, bd=1, relief=tk.SUNKEN)
+    fileAvail_text = '  File not found:\n  '+ plot_creator.subdirectory + plot_creator.filename +'\n  Probably TAU finished and renamed the file to pval.dat\n  Press "Load" to load another file. Press "Cancel" to return without change.'
     #~ myLabel = Tk.Label(top_frame_fileAvail_window, text='File not available')
-    myLabel = Tk.Label(top_frame_fileAvail_window, text=fileAvail_text)
+    myLabel = tk.Label(top_frame_fileAvail_window, text=fileAvail_text)
     myLabel.pack()
     #
     #~ fileAvail_text_widget = Tk.Text(top_frame_fileAvail_window)
@@ -1241,11 +1279,11 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
     #~ fileAvail_text_widget.configure( state= "disabled" )    
     #~ fileAvail_text_widget.pack() #side=Tk.LEFT, fill=Tk.Y)
     # add load and cancel button
-    bot_frame_fileAvail_window = Tk.Frame(fileAvail_window, bd=1, relief=Tk.SUNKEN)    
+    bot_frame_fileAvail_window = tk.Frame(fileAvail_window, bd=1, relief=tk.SUNKEN)
     #    
-    top_frame_fileAvail_window.pack(side=Tk.TOP)
+    top_frame_fileAvail_window.pack(side=tk.TOP)
     top_frame_fileAvail_window.config(height=0)
-    bot_frame_fileAvail_window.pack(side=Tk.BOTTOM)
+    bot_frame_fileAvail_window.pack(side=tk.BOTTOM)
     bot_frame_fileAvail_window.config(height=0)
     #    
     fileAvail_window.protocol("WM_DELETE_WINDOW", _save_fileAvail)
@@ -1254,12 +1292,15 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
     #
     ##############################################
     def _replot():
-        ''' 
+        """ 
         Button command to replot figure
-        '''      
+        """      
         #        
         
-        Plot.fig.subplots_adjust(bottom=float(Plot.suplot_bottom), left=float(Plot.suplot_left), right=float(Plot.suplot_right), top=float(Plot.suplot_top) )
+        plot_creator.fig.subplots_adjust(bottom=float(plot_creator.suplot_bottom),
+                                         left=float(plot_creator.suplot_left),
+                                         right=float(plot_creator.suplot_right),
+                                         top=float(plot_creator.suplot_top) )
         #
         y_variable_list = []
         for ix, item in enumerate(cb):
@@ -1270,33 +1311,33 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
         subplot = fig.add_subplot(111)
         if len(y_variable_list) > 0:            
             #
-            #~ print "Plot.replot"
-            Plot.replot(subplot,data_line, title_line,x_variable_list,y_variable_list,save_to_file)
-            Plot.add_TAU_status(fig)    
+            #~ print "plot_creator.replot"
+            plot_creator.replot(subplot,data_line, title_line,x_variable_list,y_variable_list,save_to_file)
+            plot_creator.add_TAU_status(fig)
         canvas.draw()
         
         #
     #
     def _reload():
-        ''' 
+        """ 
         Button command to reload and replot figure
-        '''
+        """
         #
         
-        return_val = Plot.get_variables()
+        return_val = plot_creator.get_variables()
         if return_val!=0:
             # file not available - open pop up dialogue to ask for open file or cancel
             #~ print 'File not available'
-            if Plot.auto_update:
-                Plot.auto_update=False
+            if plot_creator.auto_update:
+                plot_creator.auto_update=False
                 auto_switch.set(0)        
                 # reset filename to *.monitot.pval.dat
-                Plot.get_log_name(Plot.subdirectory, Plot.name_prefix)
+                plot_creator.get_log_name(plot_creator.subdirectory, plot_creator.name_prefix)
                 _reload()        
                 #pop up run finished?
                 
             else:
-                Plot.get_log_name(Plot.subdirectory, Plot.name_prefix)
+                plot_creator.get_log_name(plot_creator.subdirectory, plot_creator.name_prefix)
                 _reload()        
             #
             #_fileAvail()
@@ -1314,29 +1355,29 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
         subplot = fig.add_subplot(111)
         #
         if len(y_variable_list) > 0:            
-            Plot.replot(subplot,data_line, title_line,x_variable_list,y_variable_list,save_to_file)
-            Plot.add_TAU_status(fig)    
+            plot_creator.replot(subplot,data_line, title_line,x_variable_list,y_variable_list,save_to_file)
+            plot_creator.add_TAU_status(fig)
             #
         canvas.draw()
         #
     #    
     def _replot_with_last_InnerIter():
-        '''
+        """
         Button command to switch the values to plot only the last InnerIter
-        '''
+        """
         #~ print "_replot_with_last_InnerIter"
         
-        if Plot.plot_last_InnerIter:
-            Plot.plot_last_InnerIter = False
+        if plot_creator.plot_last_InnerIter:
+            plot_creator.plot_last_InnerIter = False
         else:
-            Plot.plot_last_InnerIter = True
+            plot_creator.plot_last_InnerIter = True
         _replot()
         #
     #    
     def _update():
-        '''
+        """
         Button command to reload the figure
-        '''        
+        """
         #
         update_button.configure(text="..Updating..", width=8)
         _reload()  
@@ -1344,24 +1385,24 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
         #
     #
     def _update_range():
-        ''' 
+        """
         Button command to update data range
-        '''
+        """
         #        
-        min_entry_var.set(float(Plot.min_entry_val))
-        max_entry_var.set(float(Plot.max_entry_val))
+        min_entry_var.set(float(plot_creator.min_entry_val))
+        max_entry_var.set(float(plot_creator.max_entry_val))
         #
-        #Plot.min_entry_val_disp = Plot.min_entry_val
-        Plot.min_entry_val_disp =  float(entry_widget_min.get())
+        #plot_creator.min_entry_val_disp = plot_creator.min_entry_val
+        plot_creator.min_entry_val_disp =  float(entry_widget_min.get())
         #
-        Plot.max_entry_val_disp = Plot.max_entry_val
-        entry_widget_min.delete(0, Tk.END)     
+        plot_creator.max_entry_val_disp = plot_creator.max_entry_val
+        entry_widget_min.delete(0, tk.END)
         #
         #~ entry_widget_min.insert(0, str(min_entry_var.get()))
         
-        entry_widget_min.insert(0, str(Plot.min_entry_val_disp))
+        entry_widget_min.insert(0, str(plot_creator.min_entry_val_disp))
         #
-        entry_widget_max.delete(0, Tk.END)
+        entry_widget_max.delete(0, tk.END)
         entry_widget_max.insert(0, str(max_entry_var.get()))
         #
         if x_variable_list[0] == 'Inner-iter':
@@ -1373,16 +1414,16 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
             entry_widget_min_label.config(text = Var_text+" (min "+str(min_entry_var.get())+")")
             entry_widget_max_label.config(text = Var_text+" (max "+str(max_entry_var.get())+")")
         #~ else:
-            #~ Var_text = "Val"
+            #~ var_text = "Val"
         
         
         #
         #        
     #
     def _save_png():
-        ''' 
+        """
         Button command to save a png file
-        '''
+        """
         #
         y_variable_list = []
         for ix, item in enumerate(cb):
@@ -1394,105 +1435,105 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
         subplot = fig.add_subplot(111)
         if len(y_variable_list) > 0:            
             #
-            Plot.replot(subplot,data_line, title_line,x_variable_list,y_variable_list,True)  
+            plot_creator.replot(subplot,data_line, title_line,x_variable_list,y_variable_list,True)
         
         fig.clear()
         subplot = fig.add_subplot(111)
         if len(y_variable_list) > 0:            
             #
-            Plot.replot(subplot,data_line, title_line,x_variable_list,y_variable_list,False)          
+            plot_creator.replot(subplot,data_line, title_line,x_variable_list,y_variable_list,False)
         
-        Plot.add_TAU_status(fig)    
-        print '---- THIS TK WARNING MAY BE IGNORED:'
-        Tk.mainloop()        
+        plot_creator.add_TAU_status(fig)
+        print('---- THIS TK WARNING MAY BE IGNORED:')
+        tk.mainloop()
     #   
     def _log_y():
-        ''' 
-        Button command to toggle logarithmic scaling of x axis '''
+        """
+        Button command to toggle logarithmic scaling of x-axis
+        """
         #
-        if Plot.y_scale_log:
-            Plot.y_scale_log = False
+        if plot_creator.y_scale_log:
+            plot_creator.y_scale_log = False
         else:
-            Plot.y_scale_log = True     
+            plot_creator.y_scale_log = True
             #
         #
         _replot()
         #
     #
     def _log_x():
-        ''' 
-        Button command to toggle logarithmic scaling of y axis 
-        '''
+        """
+        Button command to toggle logarithmic scaling of y axis
+        """
         #
-        if Plot.x_scale_log:
-            Plot.x_scale_log = False
+        if plot_creator.x_scale_log:
+            plot_creator.x_scale_log = False
         else:
-            Plot.x_scale_log = True
+            plot_creator.x_scale_log = True
         #
         _replot()
         #
     #
     def _toggle_sub_grid():
-        ''' 
-        Button command to toggle subgrid of plots 
-        '''
+        """
+        Button command to toggle subgrid of plots
+        """
         #
-        if Plot.subgrid:
-            Plot.subgrid = False
+        if plot_creator.subgrid:
+            plot_creator.subgrid = False
         else:
-            Plot.subgrid = True
+            plot_creator.subgrid = True
         #
         _replot()
         #
     #
     def _load_file():
-        ''' 
-        Button command to load another file 
-        '''
+        """
+        Button command to load another file
+        """
         #        
         file_path = tkFileDialog.askopenfilename(initialdir=subdirectory,defaultextension=".dat",filetypes=[("data files", ".dat"),("all files", ".*")])          
         #
         if not file_path == '' and  not file_path == ():         
-            Plot.filename = file_path.split('/')[-1]
-            Plot.subdirectory = '/'.join(file_path.split('/')[:-1])+'/'  
+            plot_creator.filename = file_path.split('/')[-1]
+            plot_creator.subdirectory = '/'.join(file_path.split('/')[:-1])+'/'
             fileAvail_window.withdraw()
             _reload()          
         #
         
     #
     def _title():
-        ''' 
+        """
         Button command to toggle filename in title
-        '''
+        """
         #
-        if Plot.set_title:
-            Plot.set_title = False
+        if plot_creator.set_title:
+            plot_creator.set_title = False
         else:
-            Plot.set_title = True
+            plot_creator.set_title = True
         #
         _replot()
         #
     #
     #~ -------------------------- TICKER BUTTONS    
     def _switch_ticker():
-        ''' 
+        """
         Button command to switch tickers on axes
-        
+
         Switch between:
         - with numerical offset
         - no numerical offset
         - with mathtext
-        
-        '''
+        """
         #
-        if Plot.ticker_type == 'no_offset':
-            Plot.ticker_type = 'with_offset'
+        if plot_creator.ticker_type == 'no_offset':
+            plot_creator.ticker_type = 'with_offset'
             button_ticker.configure( text = 'Offset on')
-        elif Plot.ticker_type == 'with_offset':
-            Plot.ticker_type = 'math_offset'
+        elif plot_creator.ticker_type == 'with_offset':
+            plot_creator.ticker_type = 'math_offset'
             button_ticker.configure( text = 'Offset math')
         else:
-            Plot.ticker_type = 'no_offset'
+            plot_creator.ticker_type = 'no_offset'
             button_ticker.configure( text = 'Offset none')
             #
         #
@@ -1501,16 +1542,16 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
     #
     # file not available buttons
     #~ place buttons
-    load_button_file_avail = Tk.Button(master=bot_frame_fileAvail_window, text='Load', command=_load_file)
-    load_button_file_avail.pack(side=Tk.LEFT)
-    cancel_button = Tk.Button(master=bot_frame_fileAvail_window, text='Cancel', command=_save_fileAvail)
-    cancel_button.pack(side=Tk.LEFT)   
+    load_button_file_avail = tk.Button(master=bot_frame_fileAvail_window, text='Load', command=_load_file)
+    load_button_file_avail.pack(side=tk.LEFT)
+    cancel_button = tk.Button(master=bot_frame_fileAvail_window, text='Cancel', command=_save_fileAvail)
+    cancel_button.pack(side=tk.LEFT)
     
     #
-    button_frame = Tk.Frame(root,width=50,height=100)
+    button_frame = tk.Frame(root, width=50, height=100)
     button_frame.pack()
     
-    canvas_button_frame = Tk.Canvas(button_frame)
+    canvas_button_frame = tk.Canvas(button_frame)
     canvas_button_frame.pack()
     # ######################################
     #~ # TOP FRAME SCROLLBAR
@@ -1520,38 +1561,38 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
     #~ scrollbar0y.pack(side="right",fill="y")        
         
     # ######################################
-    top_frame = Tk.Frame(canvas_button_frame, bd=1, relief=Tk.SUNKEN)
+    top_frame = tk.Frame(canvas_button_frame, bd=1, relief=tk.SUNKEN)
     
     #
     # ######################################
     #~ PLACE BUTTONS
-    quit_button = Tk.Button(master=top_frame, text='Quit', command=_quit)
-    quit_button.pack(side=Tk.LEFT)
+    quit_button = tk.Button(master=top_frame, text='Quit', command=_quit)
+    quit_button.pack(side=tk.LEFT)
     # createToolTip(quit_button,"Quit taumonplot")
     #
-    help_button = Tk.Button(master=top_frame, text='Help', command=_help)
-    help_button.pack(side=Tk.LEFT)
+    help_button = tk.Button(master=top_frame, text='Help', command=_help)
+    help_button.pack(side=tk.LEFT)
     # createToolTip(quit_button,"Quit taumonplot")
     #
     #~ button = Tk.Button(master=top_frame, text='Save .png', command=_save_png)
     #~ button.pack(side=Tk.LEFT) 
     #
-    load_button = Tk.Button(master=top_frame, text='Load', command=_load_file)
-    load_button.pack(side=Tk.LEFT)      
-    createToolTip(load_button,"Load new TAU monitoring file")
+    load_button = tk.Button(master=top_frame, text='Load', command=_load_file)
+    load_button.pack(side=tk.LEFT)
+    create_tool_tip(load_button, "Load new TAU monitoring file")
     #    
-    button_ticker = Tk.Button(master = top_frame, text = 'Offset none', command = _switch_ticker )
-    button_ticker.pack(side = Tk.LEFT) 
-    createToolTip(button_ticker,"Ticker offset (on/off/math)")
+    button_ticker = tk.Button(master = top_frame, text ='Offset none', command = _switch_ticker)
+    button_ticker.pack(side = tk.LEFT)
+    create_tool_tip(button_ticker, "Ticker offset (on/off/math)")
     #
-    update_button = Tk.Button(master=top_frame, text='   Update   ', width=8, command=_update)
-    update_button.pack(side=Tk.RIGHT)
-    createToolTip(update_button,"Manual update of monitoring file data")
+    update_button = tk.Button(master=top_frame, text='   Update   ', width=8, command=_update)
+    update_button.pack(side=tk.RIGHT)
+    create_tool_tip(update_button, "Manual update of monitoring file data")
     #
     
     #
     #  BUTTONS changed to Checkbuttons
-    '''
+    """
     scalex_button = Tk.Button(master=top_frame, text='LIN/LOG x', command=_log_x)
     scalex_button.pack(side=Tk.RIGHT)
     createToolTip(scalex_button,"Switch between linear and logarithmic scaling on X-Axis")
@@ -1568,39 +1609,39 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
     title_button.pack(side=Tk.RIGHT)      
     createToolTip(title_button,"Toggles title on off taumonplot")
     #
-    '''
+    """
     #
-    scalex_button = Tk.Checkbutton(master=top_frame, text='LIN/LOG x', command=_log_x)
-    scalex_button.pack(side=Tk.RIGHT)
-    createToolTip(scalex_button,"Switch between linear and logarithmic scaling on X-Axis")
+    scalex_button = tk.Checkbutton(master=top_frame, text='LIN/LOG x', command=_log_x)
+    scalex_button.pack(side=tk.RIGHT)
+    create_tool_tip(scalex_button, "Switch between linear and logarithmic scaling on X-Axis")
     #
-    if Plot.x_scale_log == False:
+    if plot_creator.x_scale_log == False:
         scalex_button.deselect()
     else:
         scalex_button.select()
     #
-    scaley_button = Tk.Checkbutton(master=top_frame, text='LIN/LOG y', command=_log_y)
-    scaley_button.pack(side=Tk.RIGHT)        
-    createToolTip(scaley_button,"Switch between linear and logarithmic scaling on Y-Axis")
-    if Plot.y_scale_log == False:
+    scaley_button = tk.Checkbutton(master=top_frame, text='LIN/LOG y', command=_log_y)
+    scaley_button.pack(side=tk.RIGHT)
+    create_tool_tip(scaley_button, "Switch between linear and logarithmic scaling on Y-Axis")
+    if plot_creator.y_scale_log == False:
         scaley_button.deselect()
     else:
         scaley_button.select()
     #
-    grid_button = Tk.Checkbutton(master=top_frame, text='Subgrid', command=_toggle_sub_grid)
-    grid_button.pack(side=Tk.RIGHT)
-    createToolTip(grid_button,"Toggle subgrid on/off")
+    grid_button = tk.Checkbutton(master=top_frame, text='Subgrid', command=_toggle_sub_grid)
+    grid_button.pack(side=tk.RIGHT)
+    create_tool_tip(grid_button, "Toggle subgrid on/off")
     #
-    if Plot.subgrid == False:
+    if plot_creator.subgrid == False:
         grid_button.deselect()
     else:
         grid_button.select()
-    title_button = Tk.Checkbutton(master=top_frame, text='Title', command=_title)
-    title_button.pack(side=Tk.RIGHT)      
-    createToolTip(title_button,"Toggles title on off taumonplot")
+    title_button = tk.Checkbutton(master=top_frame, text='Title', command=_title)
+    title_button.pack(side=tk.RIGHT)
+    create_tool_tip(title_button, "Toggles title on off taumonplot")
     #
     
-    if Plot.set_title == False:
+    if plot_creator.set_title == False:
         title_button.deselect()
     else:
         title_button.select()
@@ -1609,7 +1650,7 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
     #
     # ######################################
     #side=Tk.RIGHT)
-    top_frame.pack(side=Tk.TOP)
+    top_frame.pack(side=tk.TOP)
     #~ top_frame.config(height=0)
     
     
@@ -1620,182 +1661,180 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
     # #
     #~ -------------------------- AUTO UPDATE
     #
-    auto_frame = Tk.Frame(canvas_button_frame, bd=1, relief=Tk.SUNKEN)
+    auto_frame = tk.Frame(canvas_button_frame, bd=1, relief=tk.SUNKEN)
     auto_frame.pack()
     #
-    
-    
-    
-    
-    
     #
     def _set_auto_time():
-        ''' 
+        """
         Button command to set time of auto update
-        '''
+        """
         #                      
-        Plot.auto_update_time_disp = int(entry_widget_auto_update.get())               
-        auto_update_time.set(int(Plot.auto_update_time_disp))        
-        Plot.auto_update_time = Plot.auto_update_time_disp        
-        entry_widget_auto_update.delete(0, Tk.END)     
+        plot_creator.auto_update_time_disp = int(entry_widget_auto_update.get())
+        auto_update_time.set(int(plot_creator.auto_update_time_disp))
+        plot_creator.auto_update_time = plot_creator.auto_update_time_disp
+        entry_widget_auto_update.delete(0, tk.END)
         entry_widget_auto_update.insert(0, str(auto_update_time.get()))       
-        # print Plot.auto_update_time 
+        # print plot_creator.auto_update_time
         #
     #
     #
-    auto_update_time = Tk.IntVar(value = int(Plot.auto_update_time))        
-    auto_update_time_label = Tk.Label(auto_frame, text="AUTO UPDATE:")
-    auto_update_time_label.pack(side=Tk.LEFT)
-    entry_widget_auto_update = Tk.Entry(master=auto_frame, width=5)
-    entry_widget_auto_update.pack(side=Tk.LEFT)
-    createToolTip(entry_widget_auto_update,"Automatic update interval in seconds. \nNeeds to be set with 'Set'.")
+    auto_update_time = tk.IntVar(value = int(plot_creator.auto_update_time))
+    auto_update_time_label = tk.Label(auto_frame, text="AUTO UPDATE:")
+    auto_update_time_label.pack(side=tk.LEFT)
+    entry_widget_auto_update = tk.Entry(master=auto_frame, width=5)
+    entry_widget_auto_update.pack(side=tk.LEFT)
+    create_tool_tip(entry_widget_auto_update, "Automatic update interval in seconds. \nNeeds to be set with 'Set'.")
     #
-    auto_update_time_label_S = Tk.Label(auto_frame, text="(s)")
-    auto_update_time_label_S.pack(side=Tk.LEFT)
-    entry_widget_auto_update.delete(0, Tk.END)     
-    entry_widget_auto_update.insert(0, str(int(Plot.auto_update_time)))
+    auto_update_time_label_S = tk.Label(auto_frame, text="(s)")
+    auto_update_time_label_S.pack(side=tk.LEFT)
+    entry_widget_auto_update.delete(0, tk.END)
+    entry_widget_auto_update.insert(0, str(int(plot_creator.auto_update_time)))
     #
-    button_auto_update = Tk.Button(master=auto_frame, text='Set', command=_set_auto_time)
-    button_auto_update.pack(side=Tk.LEFT)
-    createToolTip(button_auto_update,"Set update interval")
+    button_auto_update = tk.Button(master=auto_frame, text='Set', command=_set_auto_time)
+    button_auto_update.pack(side=tk.LEFT)
+    create_tool_tip(button_auto_update, "Set update interval")
     #    
     def _auto_updater():
-        '''
-        Function that executes the update command and waits for set number of seconds 
-        '''
-        while Plot.auto_update:
-            time.sleep(Plot.auto_update_time)
-            print 'auto updating...'
+        """
+        Function that executes the update command and waits for set number of seconds
+        """
+        while plot_creator.auto_update:
+            time.sleep(plot_creator.auto_update_time)
+            print('auto updating...')
             _update()                        
         return
     #
     def _auto_update():
-        '''
+        """
         Auto update command. Switches between manual and auto update. Starts new thread to autoupdate
-        '''
-        import thread
-        if  Plot.auto_update:
-            Plot.auto_update = False
+        """
+        import threading
+        if  plot_creator.auto_update:
+            plot_creator.auto_update = False
         else:
-            Plot.auto_update = True                      
-            thread.start_new_thread(_auto_updater,())            
+            plot_creator.auto_update = True
+            thread = threading.Thread(target=_auto_updater, daemon=True)  # auto terminate with main program
+            thread.start()
         return
         #
     #
-    auto_switch = Tk.IntVar()    
-    Auto_button = Tk.Checkbutton( auto_frame, text="Auto", variable=auto_switch, command=_auto_update)
-    Auto_button.pack()
+    auto_switch = tk.IntVar()
+    auto_button = tk.Checkbutton(auto_frame, text="Auto", variable=auto_switch, command=_auto_update)
+    auto_button.pack()
     auto_switch.set(0)   
-    createToolTip(Auto_button,"Toggles automatic update")
+    create_tool_tip(auto_button, "Toggles automatic update")
     #
     #~ -------------------------- ENTRY WIDGETS
     #
     def _set_min():
-        ''' 
+        """
         Button command to set minimum x value to plot
-        '''
+        """
         #
-        #~ Plot.min_entry_val_disp = int(entry_widget_min.get())
-        Plot.min_entry_val_disp = float(entry_widget_min.get())
-        #~ entry_widget_min.insert(0, str(Plot.min_entry_val))
+        #~ plot_creator.min_entry_val_disp = int(entry_widget_min.get())
+        plot_creator.min_entry_val_disp = float(entry_widget_min.get())
+        #~ entry_widget_min.insert(0, str(plot_creator.min_entry_val))
         #
         _replot()
         #
     #
     def _set_max():
-        ''' 
+        """
         Button command to set maximum x value to plot
-        '''
+        """
         #   
-        #~ Plot.max_entry_val_disp = int(entry_widget_max.get() )
-        Plot.max_entry_val_disp = float(entry_widget_max.get() )
-        #~ entry_widget_min.insert(0, str(Plot.max_entry_val))
+        #~ plot_creator.max_entry_val_disp = int(entry_widget_max.get() )
+        plot_creator.max_entry_val_disp = float(entry_widget_max.get() )
+        #~ entry_widget_min.insert(0, str(plot_creator.max_entry_val))
         #
         _replot()
         #
-        #~ available_variables, min_entry_val, max_entry_val = get_variables(Plot,Plot.subdirectory, Plot.filename, data_line, title_line, x_variable_list)
+        #~ available_variables, min_entry_val, max_entry_val = get_variables(plot_creator,plot_creator.subdirectory, plot_creator.filename, data_line, title_line, x_variable_list)
     #
     def _reset():
-        ''' 
+        """
         Button command to reset values to plot
-        '''       
+        """
         #
         
-        #~ available_variables, Plot.min_entry_val, Plot.max_entry_val = get_variables(Plot,Plot.subdirectory, Plot.filename, data_line, title_line, x_variable_list) 
-        #~ Plot.get_variables()
+        #~ available_variables, plot_creator.min_entry_val, plot_creator.max_entry_val = get_variables(plot_creator,plot_creator.subdirectory, plot_creator.filename, data_line, title_line, x_variable_list)
+        #~ plot_creator.get_variables()
         
-        min_entry_var.set(float(Plot.min_entry_val))
-        max_entry_var.set(float(Plot.max_entry_val))
-        Plot.min_entry_val_disp = Plot.min_entry_val
-        Plot.max_entry_val_disp = Plot.max_entry_val
-        entry_widget_min.delete(0, Tk.END)     
+        min_entry_var.set(float(plot_creator.min_entry_val))
+        max_entry_var.set(float(plot_creator.max_entry_val))
+        plot_creator.min_entry_val_disp = plot_creator.min_entry_val
+        plot_creator.max_entry_val_disp = plot_creator.max_entry_val
+        entry_widget_min.delete(0, tk.END)
         entry_widget_min.insert(0, str(min_entry_var.get()))
-        entry_widget_max.delete(0, Tk.END)
+        entry_widget_max.delete(0, tk.END)
         entry_widget_max.insert(0, str(max_entry_var.get()))
         #
-        
+        var_text = ""
         if x_variable_list[0] == 'Inner-iter':
-            Var_text = "Iter"
-            entry_widget_min_label.config(text = Var_text+" (min "+str(min_entry_var.get())+")")
-            entry_widget_max_label.config(text = Var_text+" (max "+str(max_entry_var.get())+")")
+            var_text = "Iter"
+            entry_widget_min_label.config(text = var_text+" (min "+str(min_entry_var.get())+")")
+            entry_widget_max_label.config(text = var_text+" (max "+str(max_entry_var.get())+")")
         elif x_variable_list[0] == 'thistime':
-            Var_text = "Time"
-            entry_widget_min_label.config(text = Var_text+" (min "+str(min_entry_var.get())+")")
-            entry_widget_max_label.config(text = Var_text+" (max "+str(max_entry_var.get())+")")
+            var_text = "Time"
+            entry_widget_min_label.config(text = var_text+" (min "+str(min_entry_var.get())+")")
+            entry_widget_max_label.config(text = var_text+" (max "+str(max_entry_var.get())+")")
         #~ else:
-            #~ Var_text = "Val"
+            #~ var_text = "Val"
         
-        entry_widget_min_label.config(text = Var_text+" (min "+str(min_entry_var.get())+")")
-        entry_widget_max_label.config(text = Var_text+" (max "+str(max_entry_var.get())+")")
+        entry_widget_min_label.config(text = var_text+" (min "+str(min_entry_var.get())+")")
+        entry_widget_max_label.config(text = var_text+" (max "+str(max_entry_var.get())+")")
         #
         _replot()
         #
     #
-    entry_widget_frame = Tk.Frame(canvas_button_frame,bd=1, relief=Tk.SUNKEN)  
+    entry_widget_frame = tk.Frame(canvas_button_frame, bd=1, relief=tk.SUNKEN)
     entry_widget_frame.pack()
     #
+    WidgetState = Literal["normal", "active", "disabled"]
+    #
     if x_variable_list[0] == 'Inner-iter':
-       widget_state = "normal"
+       widget_state: WidgetState = "normal"
     else:
-       widget_state = "disabled"
+       widget_state: WidgetState  = "disabled"
        #
     if x_variable_list[0] == 'thistime':
-       widget_state_last_iter = "normal"
+       widget_state_last_iter: WidgetState  = "normal"
     else:
-       widget_state_last_iter = "disabled"
+       widget_state_last_iter: WidgetState  = "disabled"
        #
     #
     #    
-    interval_label = Tk.Label(entry_widget_frame, text="INTERVAL:")
-    interval_label.pack(side=Tk.LEFT)
+    interval_label = tk.Label(entry_widget_frame, text="INTERVAL:")
+    interval_label.pack(side=tk.LEFT)
     #
-    button_reset = Tk.Button(master=entry_widget_frame, text='Reset', command=_reset)
-    button_reset.pack(side=Tk.LEFT)
-    createToolTip(button_reset,"Resets iteration interval on display \nto all available iterations steps")
+    button_reset = tk.Button(master=entry_widget_frame, text='Reset', command=_reset)
+    button_reset.pack(side=tk.LEFT)
+    create_tool_tip(button_reset, "Resets iteration interval on display \nto all available iterations steps")
     #
-    #~ min_entry_var = Tk.IntVar(value = int(Plot.min_entry_val))   
-    min_entry_var = Tk.DoubleVar(value = float(Plot.min_entry_val))          
-    entry_widget_min_label = Tk.Label(entry_widget_frame, text="Iter (min "+str(min_entry_var.get())+")")
-    entry_widget_min_label.pack(side=Tk.LEFT)
-    entry_widget_min = Tk.Entry(master=entry_widget_frame, state=widget_state,width=10)
-    entry_widget_min.pack(side=Tk.LEFT)
-    createToolTip(entry_widget_min,"MINIMUM iteration number to display")
+    #~ min_entry_var = Tk.IntVar(value = int(plot_creator.min_entry_val))
+    min_entry_var = tk.DoubleVar(value = float(plot_creator.min_entry_val))
+    entry_widget_min_label = tk.Label(entry_widget_frame, text="Iter (min " + str(min_entry_var.get()) + ")")
+    entry_widget_min_label.pack(side=tk.LEFT)
+    entry_widget_min = tk.Entry(master=entry_widget_frame, state=widget_state, width=10)
+    entry_widget_min.pack(side=tk.LEFT)
+    create_tool_tip(entry_widget_min, "MINIMUM iteration number to display")
     #
-    button_min = Tk.Button(master=entry_widget_frame, text='Set', command=_set_min)
-    button_min.pack(side=Tk.LEFT)
-    createToolTip(button_min,"Set MINIMUM iteration number")
+    button_min = tk.Button(master=entry_widget_frame, text='Set', command=_set_min)
+    button_min.pack(side=tk.LEFT)
+    create_tool_tip(button_min, "Set MINIMUM iteration number")
     #
-    #~ max_entry_var = Tk.IntVar(value = int(Plot.max_entry_val))
-    max_entry_var = Tk.DoubleVar(value = float(Plot.max_entry_val))
-    entry_widget_max_label = Tk.Label(entry_widget_frame, text="Iter (max "+str(max_entry_var.get())+")")
-    entry_widget_max_label.pack(side=Tk.LEFT)
-    entry_widget_max = Tk.Entry(master=entry_widget_frame, state=widget_state,width=10)
-    entry_widget_max.pack(side=Tk.LEFT)
-    createToolTip(entry_widget_min,"MAXIMUM iteration number to display")
+    #~ max_entry_var = Tk.IntVar(value = int(plot_creator.max_entry_val))
+    max_entry_var = tk.DoubleVar(value = float(plot_creator.max_entry_val))
+    entry_widget_max_label = tk.Label(entry_widget_frame, text="Iter (max " + str(max_entry_var.get()) + ")")
+    entry_widget_max_label.pack(side=tk.LEFT)
+    entry_widget_max = tk.Entry(master=entry_widget_frame, state=widget_state, width=10)
+    entry_widget_max.pack(side=tk.LEFT)
+    create_tool_tip(entry_widget_min, "MAXIMUM iteration number to display")
     #
-    button_max = Tk.Button(master=entry_widget_frame, text='Set', command=_set_max)
-    button_max.pack(side=Tk.LEFT)
-    createToolTip(button_min,"Set MAXIMUM iteration number")
+    button_max = tk.Button(master=entry_widget_frame, text='Set', command=_set_max)
+    button_max.pack(side=tk.LEFT)
+    create_tool_tip(button_min, "Set MAXIMUM iteration number")
     #
     button_min.configure(state=widget_state)
     button_min.update()
@@ -1807,46 +1846,46 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
     #
     #~ --------------------------  DATA TABLE
     #    
-    table_data_frame = Tk.Frame(canvas_button_frame,bd=1 ) #, relief=Tk.SUNKEN)  
+    table_data_frame = tk.Frame(canvas_button_frame, bd=1) #, relief=Tk.SUNKEN)
     table_data_frame.pack()
     
-    table_data_frame1 = Tk.Frame(table_data_frame,bd=1 , relief=Tk.SUNKEN)  
-    table_data_frame1.pack(side=Tk.LEFT)
+    table_data_frame1 = tk.Frame(table_data_frame, bd=1, relief=tk.SUNKEN)
+    table_data_frame1.pack(side=tk.LEFT)
     #
     
-    table_data_frame2 = Tk.Frame(table_data_frame,bd=1 , relief=Tk.SUNKEN)  
-    table_data_frame2.pack(side=Tk.RIGHT)
+    table_data_frame2 = tk.Frame(table_data_frame, bd=1, relief=tk.SUNKEN)
+    table_data_frame2.pack(side=tk.RIGHT)
     #
-    table_data_label = Tk.Label(table_data_frame1, text="DATA TABLE:")
-    table_data_label.pack(side=Tk.LEFT)    
+    table_data_label = tk.Label(table_data_frame1, text="DATA TABLE:")
+    table_data_label.pack(side=tk.LEFT)
     #
     def _data_table():
-        ''' 
+        """
         Button command to enable or disable plot of data table
-        '''
+        """
         #
-        if Plot.plt_table_data:
-            Plot.plt_table_data = False
+        if plot_creator.plt_table_data:
+            plot_creator.plt_table_data = False
             # button_data_table.configure( text = '(on)')            
         else:
-            Plot.plt_table_data = True
+            plot_creator.plt_table_data = True
             # button_data_table.configure( text = '(off)')
         #        
-        #~ print Plot.plt_table_data
+        #~ print plot_creator.plt_table_data
         _replot()
         #
     #        
     def _set_table_interval():
-        ''' 
+        """
         Button command to set range of Iterations to use for mean data table
-        '''
+        """
         #                   
-        Plot.table_entry_val = float(entry_widget_table.get() )
+        plot_creator.table_entry_val = float(entry_widget_table.get() )
         #        
         _replot()
         #
     #    
-    #~ if Plot.plt_table_data:
+    #~ if plot_creator.plt_table_data:
         #~ button_data_table_text = '(off)'
     #~ else:
         #~ button_data_table_text = '(on)'
@@ -1856,19 +1895,19 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
     # button_data_table.pack(side = Tk.LEFT) 
     #   
     #
-    entry_widget_table_label = Tk.Label(table_data_frame1, text = "mean of IterNb:").pack(side = Tk.LEFT)
-    entry_widget_table = Tk.Entry(master=table_data_frame1, state=widget_state, width = 10)
-    entry_widget_table.pack(side=Tk.LEFT)
-    createToolTip(entry_widget_table,"Number of last iterations from INTERVAL used \nto calculate mean value")
+    entry_widget_table_label = tk.Label(table_data_frame1, text ="mean of IterNb:").pack(side = tk.LEFT)
+    entry_widget_table = tk.Entry(master=table_data_frame1, state=widget_state, width = 10)
+    entry_widget_table.pack(side=tk.LEFT)
+    create_tool_tip(entry_widget_table, "Number of last iterations from INTERVAL used \nto calculate mean value")
     #
-    button_table_interval = Tk.Button(master = table_data_frame1, text = 'Set interval', command = _set_table_interval)
-    button_table_interval.pack(side = Tk.LEFT)
-    createToolTip(button_table_interval,"Set number of last iterations")
+    button_table_interval = tk.Button(master = table_data_frame1, text ='Set interval', command = _set_table_interval)
+    button_table_interval.pack(side = tk.LEFT)
+    create_tool_tip(button_table_interval, "Set number of last iterations")
     #   
     #
-    button_data_table = Tk.Checkbutton( master=table_data_frame1, text="Table", variable=Plot.plt_table_data, command=_data_table)
-    button_data_table.pack(side = Tk.LEFT)
-    createToolTip(button_data_table,"Toggles data table")
+    button_data_table = tk.Checkbutton(master=table_data_frame1, text="Table", variable=plot_creator.plt_table_data, command=_data_table)
+    button_data_table.pack(side = tk.LEFT)
+    create_tool_tip(button_data_table, "Toggles data table")
     #
     button_data_table.configure(state = widget_state)
     button_min.update()
@@ -1877,9 +1916,9 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
     #
     # ##### Last Inner Iter Switch
     #
-    switch_last_iter = Tk.Checkbutton( master=table_data_frame2, text="Last InnerIter", variable=Plot.plot_last_InnerIter, command = _replot_with_last_InnerIter)
-    switch_last_iter.pack(side = Tk.LEFT)
-    createToolTip(switch_last_iter,"Toggle to plot last inner iteration values")
+    switch_last_iter = tk.Checkbutton(master=table_data_frame2, text="Last InnerIter", variable=plot_creator.plot_last_InnerIter, command = _replot_with_last_InnerIter)
+    switch_last_iter.pack(side = tk.LEFT)
+    create_tool_tip(switch_last_iter, "Toggle to plot last inner iteration values")
     #
     switch_last_iter.configure(state = widget_state_last_iter)
     switch_last_iter.update()
@@ -1889,19 +1928,19 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
     # #############################
     #
     def _enable_entries():
-        ''' 
-        Enables Iteration range buttons 
-        '''        
+        """
+        Enables Iteration range buttons
+        """
         #
         entry_widget_min.configure(state="normal")
         entry_widget_min.update()
-        entry_widget_min.delete(0, Tk.END)     
-        entry_widget_min.insert(0, str(float(Plot.min_entry_val)))
+        entry_widget_min.delete(0, tk.END)
+        entry_widget_min.insert(0, str(float(plot_creator.min_entry_val)))
         entry_widget_min.xview(0)
         entry_widget_max.configure(state="normal")
         entry_widget_max.update()
-        entry_widget_max.delete(0, Tk.END)
-        entry_widget_max.insert(0, str(float(Plot.max_entry_val)))
+        entry_widget_max.delete(0, tk.END)
+        entry_widget_max.insert(0, str(float(plot_creator.max_entry_val)))
         entry_widget_max.xview(0)
         #
         button_min.configure(state="normal")
@@ -1913,8 +1952,8 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
         #
         entry_widget_table.configure(state="normal")
         entry_widget_table.update()
-        entry_widget_table.delete(0, Tk.END)     
-        entry_widget_table.insert(0, str(Plot.table_entry_val))
+        entry_widget_table.delete(0, tk.END)
+        entry_widget_table.insert(0, str(plot_creator.table_entry_val))
         entry_widget_table.xview(0)
         button_data_table.configure(state="normal")
         button_min.update()
@@ -1923,9 +1962,9 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
         #
     #
     def _disable_entries():
-        ''' 
-        Disable Iteration range buttons 
-        '''        
+        """
+        Disable Iteration range buttons
+        """
         #
         entry_widget_min.configure(state="disabled")
         entry_widget_min.update()
@@ -1949,17 +1988,17 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
         #
     #
     def _enable_entries_thistime():
-        ''' 
-        Enables Last InnerIter buttons 
-        '''  
+        """
+        Enables Last InnerIter buttons
+        """
         switch_last_iter.configure(state="normal")
         switch_last_iter.update()
         
     def _disable_entries_thistime():
-        ''' 
-        Disable Last InnerIter buttons 
-        '''  
-        Plot.plot_last_InnerIter = False
+        """
+        Disable Last InnerIter buttons
+        """
+        plot_creator.plot_last_InnerIter = False
         switch_last_iter.deselect() 
         switch_last_iter.configure(state="disabled")
         switch_last_iter.update()
@@ -1970,14 +2009,14 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
     #    
     #~ -------------------------- Y-VARIABLES
     #
-    y_frame = Tk.Frame(canvas_button_frame, bd=1, relief=Tk.SUNKEN) 
-    y_var_label = Tk.Label(y_frame, text="Y-Variables").grid(column=0, row=0, sticky=Tk.N)
-    createToolTip(y_frame,"Variables on Y-Axis.")
+    y_frame = tk.Frame(canvas_button_frame, bd=1, relief=tk.SUNKEN)
+    y_var_label = tk.Label(y_frame, text="Y-Variables").grid(column=0, row=0, sticky=tk.N)
+    create_tool_tip(y_frame, "Variables on Y-Axis.")
     #
     def _change_variables():
-        ''' 
+        """ 
         Button command to change variables on plot. also de-/activates Iteration range buttons
-        '''        
+        """        
         #~ ENTRY WIDGETS
         
         _replot()
@@ -1985,17 +2024,17 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
         #
     #        
     def _change_variablesX(xvar):
-        ''' 
+        """ 
         Button command to change variables on plot. also de-/activates Iteration range buttons
-        '''        
+        """        
         x_variable_list[0]=xvar
         
         #~ print ' x_variable_list[0]',x_variable_list[0]
-        Plot.get_variables()
-        min_entry_var.set(float(Plot.min_entry_val))
-        max_entry_var.set(float(Plot.max_entry_val))
-        Plot.min_entry_val_disp = Plot.min_entry_val
-        Plot.max_entry_val_disp = Plot.max_entry_val
+        plot_creator.get_variables()
+        min_entry_var.set(float(plot_creator.min_entry_val))
+        max_entry_var.set(float(plot_creator.max_entry_val))
+        plot_creator.min_entry_val_disp = plot_creator.min_entry_val
+        plot_creator.max_entry_val_disp = plot_creator.max_entry_val
         #~ ENTRY WIDGETS
         #~ raise "recover data from xvariable"
         
@@ -2013,13 +2052,13 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
             _enable_entries_thistime()
             entry_widget_min.configure(state="normal")
             entry_widget_min.update()
-            entry_widget_min.delete(0, Tk.END)     
-            entry_widget_min.insert(0, str(float(Plot.min_entry_val)))
+            entry_widget_min.delete(0, tk.END)
+            entry_widget_min.insert(0, str(float(plot_creator.min_entry_val)))
             entry_widget_min.xview(0)
             entry_widget_max.configure(state="normal")
             entry_widget_max.update()
-            entry_widget_max.delete(0, Tk.END)
-            entry_widget_max.insert(0, str(float(Plot.max_entry_val)))
+            entry_widget_max.delete(0, tk.END)
+            entry_widget_max.insert(0, str(float(plot_creator.max_entry_val)))
             entry_widget_max.xview(0)
             #
             button_min.configure(state="normal")
@@ -2046,16 +2085,18 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
     mylist = list(available_variables)
     mylist.sort()    
     #
-    cb = list(range(len(mylist)))
-    cb_v = list(range(len(mylist)))    
+    cb:list = list(range(len(mylist)))
+    cb_v:list = list(range(len(mylist)))
     column_nb=0
     #
     for ix, text in enumerate(mylist):
         # IntVar() tracks checkbox status (1=checked, 0=unchecked)
-        cb_v[ix] = Tk.IntVar()
+        cb_v[ix] = tk.IntVar()
         # command is optional and responds to any cb changes
-        cb[ix] = Tk.Checkbutton( y_frame, text=text.strip('"'),
-                                                variable=cb_v[ix], command=_change_variables)
+        cb[ix] = tk.Checkbutton(y_frame,
+                                text=text.strip('"'),
+                                variable=cb_v[ix],
+                                command=_change_variables)
         # cb[ix].pack(side=Tk.LEFT)
         #
         if ((ix+1)-column_nb*4)%4 == 0:
@@ -2090,18 +2131,18 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
         #
     #    
     #
-    y_frame.pack(side=Tk.RIGHT, padx=5, pady=5)
+    y_frame.pack(side=tk.RIGHT, padx=5, pady=5)
     #
     #    
     #~ -------------------------- X-VARIABLE drop down menu
     #
-    x_frame = Tk.Frame(canvas_button_frame,bd=1, relief=Tk.SUNKEN)  
-    label_x = Tk.Label(x_frame, text="X-Variable") #.grid(column=0, row=0, sticky=Tk.N)
+    x_frame = tk.Frame(canvas_button_frame, bd=1, relief=tk.SUNKEN)
+    label_x = tk.Label(x_frame, text="X-Variable") #.grid(column=0, row=0, sticky=Tk.N)
     label_x.pack()
-    createToolTip(x_frame,"Variable on X-Axis.")
+    create_tool_tip(x_frame, "Variable on X-Axis.")
     #    
     mylist2 = list(available_variables)
-    v = Tk.StringVar()
+    v = tk.StringVar()
     v.set(x_variable_list[0])
     column_nb=0
     #
@@ -2111,11 +2152,11 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
         #
     #
     #~ print menu_vars
-    b = Tk.OptionMenu(x_frame, v, *menu_vars, command=_change_variablesX)
+    b = tk.OptionMenu(x_frame, v, *menu_vars, command=_change_variablesX)
     #~ b.config(bg = "white")
-    b.pack(side=Tk.RIGHT)
+    b.pack(side=tk.RIGHT)
     #
-    ''' old x variable choice
+    """ old x variable choice
     #~ for ix,text in enumerate(mylist2):
         # command is optional and responds to any cb changes        
         b = Tk.Radiobutton(x_frame, text=text.strip('"'), variable=v, value=text, command=_change_variables, indicatoron=0)
@@ -2136,19 +2177,19 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
         else:
             row = 1
             b.grid(column=column_nb,row=row)
-    '''
+    """
     #
-    x_frame.pack(side=Tk.LEFT, padx=5, pady=5)
+    x_frame.pack(side=tk.LEFT, padx=5, pady=5)
     #
     
-    y_frame.pack(side=Tk.RIGHT, padx=5, pady=5)
+    y_frame.pack(side=tk.RIGHT, padx=5, pady=5)
     #
     # ########################################### PLOT options
     #
     def _plot_options():
-        ''' 
+        """ 
         Button command to open plot_options window
-        '''
+        """
         #
         #~ for entry in dir(plot_options_window):
             #~ print entry
@@ -2168,8 +2209,8 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
     # change canvas_button_frame to plot_options_window         !!!!!!!!!!!!!!!!!!!
     # ############ ####################################
     
-    plot_options_window = Tk.Toplevel(root)
-    plot_options_window_canvas = Tk.Canvas(plot_options_window)
+    plot_options_window = tk.Toplevel(root)
+    plot_options_window_canvas = tk.Canvas(plot_options_window)
     plot_options_window_canvas.pack()
     plot_options_window.protocol("WM_DELETE_WINDOW", _save_plot_options)
     #~ plot_options_window_label = Tk.Label(plot_options_window, text='TAU plot options')
@@ -2179,15 +2220,15 @@ def create_plot(subdirectory,name_prefix,data_line, title_line, x_variable_list,
     #~ plot_options_window.pack()
     #
     #
-    plot_options_button = Tk.Button(master=canvas_button_frame, text='Plot\nOptions', command=_plot_options)
-    plot_options_button.pack(side=Tk.LEFT, padx=5, pady=5)
-    createToolTip(plot_options_button,"Opens/Closes plot options window")      
+    plot_options_button = tk.Button(master=canvas_button_frame, text='plot_creator\nOptions', command=_plot_options)
+    plot_options_button.pack(side=tk.LEFT, padx=5, pady=5)
+    create_tool_tip(plot_options_button, "Opens/Closes plot options window")
     #
     
    
     # - extra window: color, linestyle, marker size, markershape, marker every=5 etc
     #
-    # ############ Plot Option buttons in grid
+    # ############ plot_creator Option buttons in grid
     #
     #~ entry_widget_PLOT_OPTIONS_Corner_label = Tk.Label(plot_options_window, text="Line Opts:  ")
     #~ entry_widget_PLOT_OPTIONS_Corner_label.grid(column=0,row=0)
@@ -2216,46 +2257,46 @@ html names for colors: 'red', 'burlywood', 'chartreuse'
                             
         
     for ix,lab in enumerate(label_list):
-        entry_widget_PLOT_OPTIONS_Corner_label = Tk.Label(plot_options_window_canvas, text=lab)
+        entry_widget_PLOT_OPTIONS_Corner_label = tk.Label(plot_options_window_canvas, text=lab)
         #~ entry_widget_PLOT_OPTIONS_Corner_label.pack()
         entry_widget_PLOT_OPTIONS_Corner_label.grid(column=ix+1,row=0,padx=5, pady=1)
         text = label_tool_tip_dict[lab]
         #~ print text 
-        createToolTip(entry_widget_PLOT_OPTIONS_Corner_label,text)      
+        create_tool_tip(entry_widget_PLOT_OPTIONS_Corner_label, text)
         #
     #
     
     
     def _set_plot_options():
-        ''' 
+        """ 
         Button command to set plot options
         
         read all options from the entry widgets
-        '''
+        """
         
         # Y - Axis        
         for iter1,y_var in enumerate(mylist):
-            if y_var in Plot.plot_options_dict:            
+            if y_var in plot_creator.plot_options_dict:
                 for iter2,lab in enumerate(label_list):
                     option = option_list_widgets[iter1][iter2].get()
-                    Plot.plot_options_dict[y_var][lab] = option
+                    plot_creator.plot_options_dict[y_var][lab] = option
                 
         # X - Axis
         #
-        Plot.plot_options_dict["X-Var"] = entry_widget_x_Var_plot.get()
+        plot_creator.plot_options_dict["X-Var"] = entry_widget_x_Var_plot.get()
         #
         #
         # Label sizes        
-        Plot.plot_options_dict["ticker_size"] = entry_widget_plot_size_ticker.get()
-        Plot.plot_options_dict["legend_size"] = entry_widget_plot_size_legend.get()
-        Plot.plot_options_dict["xaxis_size"] = entry_widget_plot_size_axis_x.get()
-        Plot.plot_options_dict["yaxis_size"] = entry_widget_plot_size_axis_y.get()
+        plot_creator.plot_options_dict["ticker_size"] = entry_widget_plot_size_ticker.get()
+        plot_creator.plot_options_dict["legend_size"] = entry_widget_plot_size_legend.get()
+        plot_creator.plot_options_dict["xaxis_size"] = entry_widget_plot_size_axis_x.get()
+        plot_creator.plot_options_dict["yaxis_size"] = entry_widget_plot_size_axis_y.get()
         #
         #
-        Plot.suplot_left = entry_widget_subplot_size_left.get()
-        Plot.suplot_right = entry_widget_subplot_size_right.get()
-        Plot.suplot_top = entry_widget_subplot_size_top.get()
-        Plot.suplot_bottom = entry_widget_subplot_size_bottom.get()
+        plot_creator.suplot_left = entry_widget_subplot_size_left.get()
+        plot_creator.suplot_right = entry_widget_subplot_size_right.get()
+        plot_creator.suplot_top = entry_widget_subplot_size_top.get()
+        plot_creator.suplot_bottom = entry_widget_subplot_size_bottom.get()
         #
         _replot()
         #
@@ -2263,10 +2304,10 @@ html names for colors: 'red', 'burlywood', 'chartreuse'
         #
     #
     def _update_plot_options():
-        ''' 
+        """ 
         Command to update plot options, when toggling X-Variable or Y-variables
         
-        '''
+        """
         
         for iter1,y_var in enumerate(mylist):
             for iter2,lab in enumerate(label_list):
@@ -2283,27 +2324,27 @@ html names for colors: 'red', 'burlywood', 'chartreuse'
                 else:
                     width = 2
                 
-                option_list_widgets[iter1][iter2].delete(0, Tk.END)
+                option_list_widgets[iter1][iter2].delete(0, tk.END)
                 
-                if y_var not in Plot.plot_options_dict:
+                if y_var not in plot_creator.plot_options_dict:
                     
                     option_list_widgets[iter1][iter2].insert(0, "")
                 else:
-                    option_list_widgets[iter1][iter2].insert(0, str(Plot.plot_options_dict[y_var][lab]))
+                    option_list_widgets[iter1][iter2].insert(0, str(plot_creator.plot_options_dict[y_var][lab]))
                 
         
         entry_widget_x_Var_plot_label.config(text="X-Ax: "+x_variable_list[0])
-        entry_widget_x_Var_plot.delete(0, Tk.END)     
-        entry_widget_x_Var_plot.insert(0, Plot.plot_options_dict["X-Var"])
+        entry_widget_x_Var_plot.delete(0, tk.END)
+        entry_widget_x_Var_plot.insert(0, plot_creator.plot_options_dict["X-Var"])
         
-        entry_widget_subplot_size_left.delete(0, Tk.END)     
-        entry_widget_subplot_size_right.delete(0, Tk.END)     
-        entry_widget_subplot_size_top.delete(0, Tk.END)     
-        entry_widget_subplot_size_bottom.delete(0, Tk.END)     
-        entry_widget_subplot_size_left.insert(0, Plot.suplot_left)
-        entry_widget_subplot_size_right.insert(0, Plot.suplot_right)
-        entry_widget_subplot_size_top.insert(0, Plot.suplot_top)
-        entry_widget_subplot_size_bottom.insert(0, Plot.suplot_bottom)
+        entry_widget_subplot_size_left.delete(0, tk.END)
+        entry_widget_subplot_size_right.delete(0, tk.END)
+        entry_widget_subplot_size_top.delete(0, tk.END)
+        entry_widget_subplot_size_bottom.delete(0, tk.END)
+        entry_widget_subplot_size_left.insert(0, plot_creator.suplot_left)
+        entry_widget_subplot_size_right.insert(0, plot_creator.suplot_right)
+        entry_widget_subplot_size_top.insert(0, plot_creator.suplot_top)
+        entry_widget_subplot_size_bottom.insert(0, plot_creator.suplot_bottom)
         
     
         return
@@ -2316,12 +2357,12 @@ html names for colors: 'red', 'burlywood', 'chartreuse'
     option_list_widgets = []
         
     ########################### Size of tickers, plot labels, axis labels
-    option_list_TAU_label = Tk.Label(plot_options_window_canvas, text="TAU var")
+    option_list_TAU_label = tk.Label(plot_options_window_canvas, text="TAU var")
     option_list_TAU_label.grid(column=0,row=0)
 
     for iter1,y_var in enumerate(mylist):        
 
-        option_list_variable_labels.append(Tk.Label(plot_options_window_canvas, text=y_var))       
+        option_list_variable_labels.append(tk.Label(plot_options_window_canvas, text=y_var))
         option_list_variable_labels[-1].grid(column=0,row=iter1+2)
         #~ 
         # #####################
@@ -2329,10 +2370,10 @@ html names for colors: 'red', 'burlywood', 'chartreuse'
         # #####################
         option_list_widgets_options = []
         
-        if y_var not in Plot.plot_options_dict:
-            Plot.plot_options_dict[y_var] = {}
+        if y_var not in plot_creator.plot_options_dict:
+            plot_creator.plot_options_dict[y_var] = {}
             for iter2 in label_list:                    
-                Plot.plot_options_dict[y_var][iter2] = ""
+                plot_creator.plot_options_dict[y_var][iter2] = ""
         
         for iter2,lab in enumerate(label_list):
             #
@@ -2347,18 +2388,18 @@ html names for colors: 'red', 'burlywood', 'chartreuse'
             else:
                 width = 3
             
-            if y_var not in Plot.plot_options_dict:
-                Plot.plot_options_dict[y_var] = {}
+            if y_var not in plot_creator.plot_options_dict:
+                plot_creator.plot_options_dict[y_var] = {}
                 for label2 in label_list:                    
-                    Plot.plot_options_dict[y_var][label2] = ""
+                    plot_creator.plot_options_dict[y_var][label2] = ""
                     #
                 #   
             #
-            entry_widget_Option = Tk.Entry(master=plot_options_window_canvas, state="normal", width=width)
+            entry_widget_Option = tk.Entry(master=plot_options_window_canvas, state="normal", width=width)
             entry_widget_Option.grid(column=iter2+1,row=iter1+2)
             entry_widget_Option.update()
-            entry_widget_Option.delete(0, Tk.END)     
-            entry_widget_Option.insert(0, str(Plot.plot_options_dict[y_var][lab]))
+            entry_widget_Option.delete(0, tk.END)
+            entry_widget_Option.insert(0, str(plot_creator.plot_options_dict[y_var][lab]))
             option_list_widgets_options.append(entry_widget_Option)
             #
         #
@@ -2370,60 +2411,60 @@ html names for colors: 'red', 'burlywood', 'chartreuse'
     # ADD FOR X-AXIS LABEL
     # ######################## 
     #    
-    entry_widget_x_Var_plot_label = Tk.Label(plot_options_window_canvas, text="X-Ax: "+x_variable_list[0])
+    entry_widget_x_Var_plot_label = tk.Label(plot_options_window_canvas, text="X-Ax: " + x_variable_list[0])
     entry_widget_x_Var_plot_label.grid(column=0,row=iter1+3,padx=5, pady=20)
-    entry_widget_x_Var_plot = Tk.Entry(master=plot_options_window_canvas, state="normal", width=15)
+    entry_widget_x_Var_plot = tk.Entry(master=plot_options_window_canvas, state="normal", width=15)
     entry_widget_x_Var_plot.grid(column=2,row=iter1+3)
     entry_widget_x_Var_plot.update()
-    entry_widget_x_Var_plot.delete(0, Tk.END)     
-    entry_widget_x_Var_plot.insert(0, Plot.plot_options_dict["X-Var"])
+    entry_widget_x_Var_plot.delete(0, tk.END)
+    entry_widget_x_Var_plot.insert(0, plot_creator.plot_options_dict["X-Var"])
     #    
-    option_list_set_button = Tk.Button(master=plot_options_window_canvas, text='Set', command=_set_plot_options)
+    option_list_set_button = tk.Button(master=plot_options_window_canvas, text='Set', command=_set_plot_options)
     option_list_set_button.grid(column=iter2+2,row=iter1+4)
-    createToolTip(option_list_set_button,"Set all plot style options and replot")
+    create_tool_tip(option_list_set_button, "Set all plot style options and replot")
     #    
     # ######################## 
-    # ADD FOR Ticker Size, Axis Label Size, Plot Label size
+    # ADD FOR Ticker Size, Axis Label Size, plot_creator Label size
     # ######################## 
     #    
-    size_labels = Tk.Label(plot_options_window_canvas, text="Label sizes")
+    size_labels = tk.Label(plot_options_window_canvas, text="Label sizes")
     size_labels.grid(column=0,row=iter1+4,padx=5, pady=10)
     #
-    entry_widget_plot_size_ticker_label = Tk.Label(plot_options_window_canvas, text="ticker:")
+    entry_widget_plot_size_ticker_label = tk.Label(plot_options_window_canvas, text="ticker:")
     entry_widget_plot_size_ticker_label.grid(column=1,row=iter1+4)
-    entry_widget_plot_size_ticker = Tk.Entry(master=plot_options_window_canvas, state="normal", width=6)
+    entry_widget_plot_size_ticker = tk.Entry(master=plot_options_window_canvas, state="normal", width=6)
     entry_widget_plot_size_ticker.grid(column=2,row=iter1+4)
     entry_widget_plot_size_ticker.update()
-    entry_widget_plot_size_ticker.delete(0, Tk.END)     
-    entry_widget_plot_size_ticker.insert(0, Plot.plot_options_dict["ticker_size"])
-    createToolTip(entry_widget_plot_size_ticker,"Set the ticker font size\nEither a relative value of 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large' or an absolute font size, e.g., 12")
+    entry_widget_plot_size_ticker.delete(0, tk.END)
+    entry_widget_plot_size_ticker.insert(0, plot_creator.plot_options_dict["ticker_size"])
+    create_tool_tip(entry_widget_plot_size_ticker, "Set the ticker font size\nEither a relative value of 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large' or an absolute font size, e.g., 12")
     #
-    entry_widget_plot_size_legend_label = Tk.Label(plot_options_window_canvas, text="legend:")
+    entry_widget_plot_size_legend_label = tk.Label(plot_options_window_canvas, text="legend:")
     entry_widget_plot_size_legend_label.grid(column=3,row=iter1+4)
-    entry_widget_plot_size_legend =  Tk.Entry(master=plot_options_window_canvas, state="normal", width=6)
+    entry_widget_plot_size_legend =  tk.Entry(master=plot_options_window_canvas, state="normal", width=6)
     entry_widget_plot_size_legend.grid(column=4,row=iter1+4)
     entry_widget_plot_size_legend.update()
-    entry_widget_plot_size_legend.delete(0, Tk.END)     
-    entry_widget_plot_size_legend.insert(0, Plot.plot_options_dict["legend_size"])
-    createToolTip(entry_widget_plot_size_legend,"Set the legend font size\nEither a relative value of 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large' or an absolute font size, e.g., 12")
+    entry_widget_plot_size_legend.delete(0, tk.END)
+    entry_widget_plot_size_legend.insert(0, plot_creator.plot_options_dict["legend_size"])
+    create_tool_tip(entry_widget_plot_size_legend, "Set the legend font size\nEither a relative value of 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large' or an absolute font size, e.g., 12")
     #    
-    entry_widget_plot_size_axis_label_x_label = Tk.Label(plot_options_window_canvas, text="x-axis:")
+    entry_widget_plot_size_axis_label_x_label = tk.Label(plot_options_window_canvas, text="x-axis:")
     entry_widget_plot_size_axis_label_x_label.grid(column=5,row=iter1+4)
-    entry_widget_plot_size_axis_x =  Tk.Entry(master=plot_options_window_canvas, state="normal", width=6)
+    entry_widget_plot_size_axis_x =  tk.Entry(master=plot_options_window_canvas, state="normal", width=6)
     entry_widget_plot_size_axis_x.grid(column=6,row=iter1+4)
     entry_widget_plot_size_axis_x.update()
-    entry_widget_plot_size_axis_x.delete(0, Tk.END)     
-    entry_widget_plot_size_axis_x.insert(0, Plot.plot_options_dict["xaxis_size"])
-    createToolTip(entry_widget_plot_size_axis_x,"Set the x-axis font size\nEither a relative value of 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large' or an absolute font size, e.g., 12")
+    entry_widget_plot_size_axis_x.delete(0, tk.END)
+    entry_widget_plot_size_axis_x.insert(0, plot_creator.plot_options_dict["xaxis_size"])
+    create_tool_tip(entry_widget_plot_size_axis_x, "Set the x-axis font size\nEither a relative value of 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large' or an absolute font size, e.g., 12")
     #
-    entry_widget_plot_size_axis_label_y_label = Tk.Label(plot_options_window_canvas, text="y-axis:")
+    entry_widget_plot_size_axis_label_y_label = tk.Label(plot_options_window_canvas, text="y-axis:")
     entry_widget_plot_size_axis_label_y_label.grid(column=7,row=iter1+4)
-    entry_widget_plot_size_axis_y =  Tk.Entry(master=plot_options_window_canvas, state="normal", width=6)
+    entry_widget_plot_size_axis_y =  tk.Entry(master=plot_options_window_canvas, state="normal", width=6)
     entry_widget_plot_size_axis_y.grid(column=8,row=iter1+4)
     entry_widget_plot_size_axis_y.update()
-    entry_widget_plot_size_axis_y.delete(0, Tk.END)     
-    entry_widget_plot_size_axis_y.insert(0, Plot.plot_options_dict["yaxis_size"])
-    createToolTip(entry_widget_plot_size_axis_y,"Set the y-axis font size\nEither a relative value of 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large' or an absolute font size, e.g., 12")
+    entry_widget_plot_size_axis_y.delete(0, tk.END)
+    entry_widget_plot_size_axis_y.insert(0, plot_creator.plot_options_dict["yaxis_size"])
+    create_tool_tip(entry_widget_plot_size_axis_y, "Set the y-axis font size\nEither a relative value of 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large' or an absolute font size, e.g., 12")
     #    
     # ################################
     # SUBPLOT SIZE ADJUSTMENT
@@ -2431,33 +2472,33 @@ html names for colors: 'red', 'burlywood', 'chartreuse'
     #
     
     #
-    entry_widget_subplot_size_label = Tk.Label(plot_options_window_canvas, text="Subplot size:")
+    entry_widget_subplot_size_label = tk.Label(plot_options_window_canvas, text="Subplot size:")
     entry_widget_subplot_size_label.grid(column=0,row=iter1+5)
-    entry_widget_subplot_size_left = Tk.Entry(master=plot_options_window_canvas, state="normal", width=6)
+    entry_widget_subplot_size_left = tk.Entry(master=plot_options_window_canvas, state="normal", width=6)
     entry_widget_subplot_size_left.grid(column=1,row=iter1+5)
     entry_widget_subplot_size_left.update()
-    entry_widget_subplot_size_left.delete(0, Tk.END)     
-    entry_widget_subplot_size_left.insert(0, Plot.suplot_left)
-    createToolTip(entry_widget_subplot_size_left,"Distance from left border in figure coordinates")
-    entry_widget_subplot_size_right = Tk.Entry(master=plot_options_window_canvas, state="normal", width=6)
+    entry_widget_subplot_size_left.delete(0, tk.END)
+    entry_widget_subplot_size_left.insert(0, plot_creator.suplot_left)
+    create_tool_tip(entry_widget_subplot_size_left, "Distance from left border in figure coordinates")
+    entry_widget_subplot_size_right = tk.Entry(master=plot_options_window_canvas, state="normal", width=6)
     entry_widget_subplot_size_right.grid(column=2,row=iter1+5)
     entry_widget_subplot_size_right.update()
-    entry_widget_subplot_size_right.delete(0, Tk.END)     
-    entry_widget_subplot_size_right.insert(0, Plot.suplot_right)
-    createToolTip(entry_widget_subplot_size_right,"Distance from right border in figure coordinates")
-    entry_widget_subplot_size_top = Tk.Entry(master=plot_options_window_canvas, state="normal", width=6)
+    entry_widget_subplot_size_right.delete(0, tk.END)
+    entry_widget_subplot_size_right.insert(0, plot_creator.suplot_right)
+    create_tool_tip(entry_widget_subplot_size_right, "Distance from right border in figure coordinates")
+    entry_widget_subplot_size_top = tk.Entry(master=plot_options_window_canvas, state="normal", width=6)
     entry_widget_subplot_size_top.grid(column=3,row=iter1+5)
     entry_widget_subplot_size_top.update()
-    entry_widget_subplot_size_top.delete(0, Tk.END)     
-    entry_widget_subplot_size_top.insert(0, Plot.suplot_top)
-    createToolTip(entry_widget_subplot_size_top,"Distance from top border in figure coordinates")
-    entry_widget_subplot_size_bottom = Tk.Entry(master=plot_options_window_canvas, state="normal", width=6)
+    entry_widget_subplot_size_top.delete(0, tk.END)
+    entry_widget_subplot_size_top.insert(0, plot_creator.suplot_top)
+    create_tool_tip(entry_widget_subplot_size_top, "Distance from top border in figure coordinates")
+    entry_widget_subplot_size_bottom = tk.Entry(master=plot_options_window_canvas, state="normal", width=6)
     entry_widget_subplot_size_bottom.grid(column=4,row=iter1+5)
     entry_widget_subplot_size_bottom.update()
-    entry_widget_subplot_size_bottom.delete(0, Tk.END)     
-    entry_widget_subplot_size_bottom.insert(0, Plot.suplot_bottom)
-    createToolTip(entry_widget_subplot_size_bottom,"Distance from bottom border in figure coordinates")
-    print "done.."   
+    entry_widget_subplot_size_bottom.delete(0, tk.END)
+    entry_widget_subplot_size_bottom.insert(0, plot_creator.suplot_bottom)
+    create_tool_tip(entry_widget_subplot_size_bottom, "Distance from bottom border in figure coordinates")
+    print("done..")
     #
     # ###########################################
     #
@@ -2475,13 +2516,13 @@ html names for colors: 'red', 'burlywood', 'chartreuse'
         entry_widget_max_label.config(text = "Time (max "+str(max_entry_var.get())+")")
         entry_widget_min.configure(state="normal")
         entry_widget_min.update()
-        entry_widget_min.delete(0, Tk.END)     
-        entry_widget_min.insert(0, str(float(Plot.min_entry_val)))
+        entry_widget_min.delete(0, tk.END)
+        entry_widget_min.insert(0, str(float(plot_creator.min_entry_val)))
         entry_widget_min.xview(0)
         entry_widget_max.configure(state="normal")
         entry_widget_max.update()
-        entry_widget_max.delete(0, Tk.END)
-        entry_widget_max.insert(0, str(float(Plot.max_entry_val)))
+        entry_widget_max.delete(0, tk.END)
+        entry_widget_max.insert(0, str(float(plot_creator.max_entry_val)))
         entry_widget_max.xview(0)
         #
         button_min.configure(state="normal")
@@ -2496,16 +2537,16 @@ html names for colors: 'red', 'burlywood', 'chartreuse'
     #       
     #
     #~ run in loop for input
-    Tk.mainloop()
+    tk.mainloop()
     #
 #
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
 #
 class ToolTip(object):
-    '''
+    """
     ToolTip classs from Michael Foord
     http://www.voidspace.org.uk/python/weblog/arch_d7_2006_07_01.shtml#e387
-    '''
+    """
     def __init__(self, widget):
         self.widget = widget
         self.tipwindow = None
@@ -2517,16 +2558,16 @@ class ToolTip(object):
         return
     #
     def showtip(self, text):
-        '''
+        """
         Display text in tooltip window
-        '''
+        """
         self.text = text
         if self.tipwindow or not self.text:
             return
         x, y, cx, cy = self.widget.bbox("insert")
         x = x + self.widget.winfo_rootx() + 27  +10
         y = y + cy + self.widget.winfo_rooty() +27 +10
-        self.tipwindow = tw = Tk.Toplevel(self.widget)
+        self.tipwindow = tw = tk.Toplevel(self.widget)
         tw.wm_overrideredirect(1)
         tw.wm_geometry("+%d+%d" % (x, y))
         # try:
@@ -2536,16 +2577,16 @@ class ToolTip(object):
                        # "help", "noActivates")
         # except TclError:
             # pass
-        label = Tk.Label(tw, text=self.text, justify=Tk.LEFT,
-                      background="#ffffe0", relief=Tk.SOLID, borderwidth=1,
-                      font=("tahoma", "8", "normal"))
+        label = tk.Label(tw, text=self.text, justify=tk.LEFT,
+                         background="#ffffe0", relief=tk.SOLID, borderwidth=1,
+                         font=("tahoma", "8", "normal"))
         label.pack(ipadx=1)
         return
     #
     def hidetip(self):
-        '''
+        """
         Remove text in tooltip window
-        '''
+        """
         tw = self.tipwindow
         self.tipwindow = None
         if tw:
@@ -2556,17 +2597,17 @@ class ToolTip(object):
 #
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
 #
-def createToolTip(widget, text):
-    '''
+def create_tool_tip(widget, text):
+    """
     Function to create ToolTips given a widget and a TooltipText
-    '''
-    toolTip = ToolTip(widget)
+    """
+    tool_tip = ToolTip(widget)
     #
     def enter(event):
         # if time() - self.lastMotion > self.delay
-        toolTip.showtip(text)
+        tool_tip.showtip(text)
     def leave(event):
-        toolTip.hidetip()
+        tool_tip.hidetip()
     #
     def move( event ):
         """
@@ -2575,16 +2616,16 @@ def createToolTip(widget, text):
         Arguments:
           event: The event that called this function
         """
-        toolTip.lastMotion = time.time()
-        if toolTip.follow == False:                                                # If the follow flag is not set, motion within the widget will make the ToolTip dissapear
-            toolTip.tipwindow.withdraw()
-            toolTip.visible = 1
-        # toolTip.geometry( '+%i+%i' % ( event.x_root+10, event.y_root+10 ) )        # Offset the ToolTip 10x10 pixes southwest of the pointer
+        tool_tip.lastMotion = time.time()
+        if tool_tip.follow == False:                                                # If the follow flag is not set, motion within the widget will make the ToolTip dissapear
+            tool_tip.tipwindow.withdraw()
+            tool_tip.visible = 1
+        # tool_tip.geometry( '+%i+%i' % ( event.x_root+10, event.y_root+10 ) )        # Offset the ToolTip 10x10 pixes southwest of the pointer
         try:
-            toolTip.msgVar.set( toolTip.msgFunc() )                                   # Try to call the message function.  Will not change the message if the message function is None or the message function fails
+            tool_tip.msgVar.set( tool_tip.msgFunc() )                                   # Try to call the message function.  Will not change the message if the message function is None or the message function fails
         except:
             pass
-        toolTip.tipwindow.after( int( toolTip.delay * 1000 ), toolTip.showtip(text) )
+        tool_tip.tipwindow.after( int( tool_tip.delay * 1000 ), tool_tip.showtip(text) )
     #
     # bind to widget
     widget.bind('<Enter>', enter)
@@ -2595,9 +2636,16 @@ def createToolTip(widget, text):
 #
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
 #
-def ascii_read(filename, data_line, title_line=None, title_line_junk='#',
-               column_titles=True,return_header=False,string_cols=[],
-                usecols=[], loadtxt_args=None, check_iter_numbers=False):
+def ascii_read(filename,
+               data_line,
+               title_line=None,
+               title_line_junk='#',
+               column_titles=True,
+               return_header=False,
+               string_cols: list = None,
+               usecols=None,
+               loadtxt_args=None,
+               check_iter_numbers=False):
     """A wrapper around numpy loadtxt to load acsii data files, allowing for 
     headers, string columns and returning the output as a dictionary using a
     line in the header as keys.
@@ -2662,27 +2710,26 @@ def ascii_read(filename, data_line, title_line=None, title_line_junk='#',
         
     
     #Open file
-    if _is_string_like(filename):
+    if is_string_like(filename):
         try:            
-            f = file(filename)
+            f = open(filename)
             #~ print "Opening file '",filename,"' ..."
-        except IOError, e:                        
-            print e,'Could not open file.'
+        except IOError as e:
+            print(e,'Could not open file.')
             exit()
     elif hasattr(filename, 'readline'):
         try:      
             f = filename
-            #~ print "Opening file '",filename,"'"
         except:
-            print 'Could not open file "',filename,'". File not found. '
+            print('Could not open file "',filename,'". File not found. ')
             exit()
     else:
         raise ValueError('fname must be a string or file handle') 
     
-    """Read in Header and initial processing"""
+    ## # Read in Header and initial processing
     #Read in the header to a list, in the process skipping it
     header = []
-    for i in xrange(data_line-1):
+    for i in range(data_line-1):
         header.append(f.readline())
     #Store position in file where header ends
     data_start = f.tell()
@@ -2695,7 +2742,7 @@ def ascii_read(filename, data_line, title_line=None, title_line_junk='#',
     #Do not read in string_cols, set usecols to be all columns that arn't string
     if string_cols:
         #List of columns
-        columns = range(N)
+        columns: list = list(range(N))
         #remove string_cols from columns
         for i in string_cols:
             columns.remove(i)
@@ -2706,10 +2753,10 @@ def ascii_read(filename, data_line, title_line=None, title_line_junk='#',
         #put columns into loadtxt
         loadtxt_args.update({"usecols":columns}) #TODO: Catch no columns!
     else:
-        if loadtxt_args.has_key("usecols"):
+        if "usecols" in loadtxt_args:
             columns = loadtxt_args["usecols"]
         else:
-            columns = range(N)
+            columns = list(range(N))
     
     #Read file
     f.seek(data_start)
@@ -2728,7 +2775,7 @@ def ascii_read(filename, data_line, title_line=None, title_line_junk='#',
         sdata = np.loadtxt(f, **loadtxt_args)    
     
     #If no column titles then return array
-    if not(column_titles):
+    if not column_titles:
         #Sort array so that the array is in the same order as the file
         fdata = np.zeros([len(columns)])
         if string_cols:
@@ -2743,7 +2790,9 @@ def ascii_read(filename, data_line, title_line=None, title_line_junk='#',
             return fdata
    
     
-    def dict_maker(header, columns, data):
+    def dict_maker(header,
+                   columns,
+                   data):
         """
         Creates a dictionary from a list of columns and the data array
         """
@@ -2754,13 +2803,13 @@ def ascii_read(filename, data_line, title_line=None, title_line_junk='#',
         fkeys = []
         if len(keys) == len(columns):
             #~ same length
-            for i in columns:
-                fkeys.append(keys[i])
+            for col_id in columns:
+                fkeys.append(keys[col_id])
         else:
             #~ remove first variable (Tau Monitor first value == '"VARIABLES="')
             keys.pop(0)            
-            for i in columns:
-                fkeys.append(keys[i])
+            for col_id in columns:
+                fkeys.append(keys[col_id])
             
         #Zip fails if only one column selected
         if len(fkeys) == 1:
@@ -2776,13 +2825,13 @@ def ascii_read(filename, data_line, title_line=None, title_line_junk='#',
         sdict = dict_maker(header, string_cols, sdata)  
         outdict.update(sdict)
 
-    '''# added by Ian Krukow #'''
-    if check_iter_numbers and outdict.has_key('"Inner-iter"'):
+    """# added by Ian Krukow #"""
+    if check_iter_numbers and '"Inner-iter"' in outdict:
         for ii in range(1, len(outdict['"Inner-iter"'])):
             inc = outdict['"Inner-iter"'][ii] - outdict['"Inner-iter"'][ii-1]
             if inc < 0:
                 outdict['"Inner-iter"'][ii:] += 1 - inc
-    '''# /added by Ian Krukow #'''
+    """# /added by Ian Krukow #"""
 
     f.close()
     #~ print '...done'
@@ -2797,12 +2846,18 @@ def ascii_read(filename, data_line, title_line=None, title_line_junk='#',
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
 #
 if __name__ == "__main__": 
-    print "-"*40
-    print " taumonplot.py, version info in file header"
-    print "-"*40
+    print("-"*40)
+    print(" taumonplot.py, version info in file header")
+    print("-"*40)
     #   
-    create_plot(subdirectory,name_prefix,data_line, title_line,x_variable_list,y_variable_list,check_iter_numbers,save_to_file)
-    #
+    create_plot(subdirectory,
+                name_prefix,
+                data_line,
+                title_line,
+                x_variable_list,
+                y_variable_list,
+                check_iter_numbers,
+                save_to_file)
     #
 #
     
