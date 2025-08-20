@@ -14,6 +14,7 @@
 #* Structures at the Technical University of Braunschweig                       *
 #*                                                                              *
 #* This program is written in Python <= 2.7 under Windows and Linux             *
+#* This program was updated to support Python 3.X                               *
 #*                                                                              *
 #* This program is distributed in the hope that it will be useful,              *
 #* but WITHOUT ANY WARRANTY; without even the implied warranty of               *
@@ -49,16 +50,15 @@ import platform         # for platform checks WIN/UNIX
 
 import sphinx		# for version checks
 sphinx_version = sphinx.__version__
-print "-Using Sphinx version %s" % (sphinx_version)
+print(f"-Using Sphinx version {sphinx_version}")
 
-IFL_LOGO_pdf = "2010_Logo_IFL.png"
-IFL_LOGO_html = "IFL_Logo_10.png"
+IFL_LOGO_PDF = "2010_Logo_IFL.png"
+IFL_LOGO_HTML = "IFL_Logo_10.png"
 
 def main():
-    
-    '''
+    """
     .. available builders::
-    
+
     ==========	===============================================================================================================================
     builder		description
     ==========	===============================================================================================================================
@@ -68,22 +68,22 @@ def main():
     singlehtml 	combines the whole project in one output file
     changes 	Usefull for ChangeLog file. HTML overview of all versionadded, versionchanged and deprecated directives for the current version
     linkcheck 	scans all documents for external links, tries to open them with urllib2, and writes an overview which ones are broken and redirected to standard output and to output.txt
-                 
-    dirhtml 	directory with HTML files    
+
+    dirhtml 	directory with HTML files
     text  		text file for each reST file
-    man 		manual pages in the groff format    
-    texinfo  	Texinfo files that can be processed into Info files by the makeinfo program    
+    man 		manual pages in the groff format
+    texinfo  	Texinfo files that can be processed into Info files by the makeinfo program
     pickle 		directory with pickle files containing mostly HTML fragments and TOC information
     json 		directory with JSON files containing mostly HTML fragments and TOC information
-    gettext  	gettext-style message catalogs    
+    gettext  	gettext-style message catalogs
     ==========	===============================================================================================================================
-    '''
+    """
     # ###############
     # BUILDER SETTINGS
     # ###############   
-    outputs=['html', 'latex','dirhtml', 'singlehtml','epub', 'text','man', 'texinfo']    # list of output formats     
-    outputs=['html','singlehtml', 'latex']       
-    outputs=['text','man','texinfo']
+    # outputs=['html', 'latex','dirhtml', 'singlehtml','epub', 'text','man', 'texinfo']    # list of output formats
+    # outputs=['html','singlehtml', 'latex']
+    # outputs=['text','man','texinfo']
     outputs=['latex']
     #
     # ###############
@@ -124,7 +124,7 @@ def main():
         path_pdflatex='C:/MiKTeX 2.9/miktex/bin/pdflatex'      # which pdflatex (only necessary if latex in outputs)
                 
     else: 
-        print "- ERROR: skript not configured for platform %s. Check code and add platform type" % (platform.system() )
+        print(f"- ERROR: skript not configured for platform {platform.system()}. Check code and add platform type")
         raise
         
     # ###############
@@ -141,10 +141,10 @@ def main():
     graph=True                              # Switch to include inheritance diagram. Graphiviz is necessary.
     if sphinx_version <= '1.1':
         graph=False                         # Graph not working. Error *.map file not found for graphviz manipulation.
-    log=True                                # Generate a log file
+    # log=True                                # Generate a log file
     log=False
     code_rst_header = None                  # Header of the documentation. Written into 'code.rst'
-    delete = False                          # Delete source folder
+    # delete = False                          # Delete source folder
     delete = True      
 
     # ###############
@@ -152,55 +152,55 @@ def main():
     # ###############
     
     if not os.path.isfile(path_sphinx):
-        print "- ERROR: path to sphinx-build not found. Check variable 'path_sphinx'!"
+        print( "- ERROR: path to sphinx-build not found. Check variable 'path_sphinx'!")
         raise
     if graph and not os.path.isfile(path_graphviz):
-        print "- ERROR: path to graphviz (dot) not found. Check variable 'path_graphviz'!"
+        print( "- ERROR: path to graphviz (dot) not found. Check variable 'path_graphviz'!")
         raise
     if 'latex' in outputs and not os.path.isfile(path_pdflatex):
-        print "- ERROR: path to pdflatex not found. Check variable 'path_pdflatex'!"
+        print( "- ERROR: path to pdflatex not found. Check variable 'path_pdflatex'!")
         raise
     if not os.path.isdir("./_static"):
-        print "- ERROR: folder './_static' missing. Copy the folder and place it in the same as this file!"
+        print( "- ERROR: folder './_static' missing. Copy the folder and place it in the same as this file!")
         raise
     
     #===============================================================================
     # GENERATOR
     #===============================================================================
     for output in outputs:
-        print " --- Generating for output %s" % (output)
-        d = Documentation_sphinx(output=output,
-                                 project_name=project_name,
-                                 path_main=path_main,
-                                 
-                                 #path_target=path_target,
-                                 
-                                 path_source=path_source,                     
-                                 path_doctree=path_doctree,
-                                 path_files_rst=path_files_rst,
-                                 
-                                 path_sphinx=path_sphinx,
-                                 path_graphviz=path_graphviz,
-                                 path_sphinx_patterns=path_sphinx_patterns,
-                                 path_pdflatex=path_pdflatex,
-                                 
-                                 version=version,
-                                 release=release,
-                                 author=author,
-                                 files_py=files_py,
-                                 files_py_members=files_py_members,
-                                 files_rst=files_rst,
-                                 code_rst_header=code_rst_header,
-                                 graph = graph,
-                                 log=log,
-                                 delete=delete)
+        print(f" --- Generating for output {output}")
+        d = DocumentationSphinx(output=output,
+                                project_name=project_name,
+                                path_main=path_main,
+
+                                #path_target=path_target,
+
+                                path_source=path_source,
+                                path_doctree=path_doctree,
+                                path_files_rst=path_files_rst,
+
+                                path_sphinx=path_sphinx,
+                                path_graphviz=path_graphviz,
+                                path_sphinx_patterns=path_sphinx_patterns,
+                                path_pdflatex=path_pdflatex,
+
+                                version=version,
+                                release=release,
+                                author=author,
+                                files_py=files_py,
+                                files_py_members=files_py_members,
+                                files_rst=files_rst,
+                                code_rst_header=code_rst_header,
+                                graph = graph,
+                                log=log,
+                                delete=delete)
         d.autorun()
     #===============================================================================
     # \GENERATOR
     #===============================================================================
     #
 #
-class BaseObject():
+class BaseObject:
     """
     This class contains basic methods and attributes. It is a general base class. 
     """
@@ -229,35 +229,34 @@ class BaseObject():
         
         self.o+=o
     
-    def om(self,o=1):
+    def om(self,o:int=1):
         """
         Decrease of output indentation level.
         
         :param o: Decrementor of output indentation level (default=1)
         :type o: integer
         """
-        
         self.o-=o
     
-    def save(self,fileName):
+    def save(self, file_name):
         """
         Save instance with pickle.
         
-        :param fileName: Name of the file
-        :type fileName: string
+        :param file_name: Name of the file
+        :type file_name: string
         
         .. note::
             - If no absolute path is given, stores in ``'./'`` (just like pickle)
             - Use of file-extension is recommended (e.g. ``'.pck'``)
         
         """
-        self.write("SAVE object as '%s'" % fileName)
-        fout = open(fileName,'wb')
-        p.dump(self,fout)
+        self.write(f"SAVE object as '{file_name}'")
+        fout = open(file_name,'wb')
+        p.dump(self, fout)
         fout.close()
         self.write("SAVING object finished")
     
-    def write(self,string):
+    def write(self, string: str):
         """
         String which will be printed with indentation corresponding to current output level
         
@@ -274,9 +273,10 @@ class BaseObject():
         
         """
         
-        print self.o*self.b,'%s' % string
-    
-    def s_fmt(self,s):
+        print( self.o*self.b, string)
+
+    @staticmethod
+    def s_fmt(s:str):
         """
         Format input string for easier comparison regardless of Capitals or whitespaces
             - Remove whitespaces
@@ -287,7 +287,8 @@ class BaseObject():
         """
         return s.replace(' ','').lower()
 
-class Documentation_sphinx(BaseObject):
+
+class DocumentationSphinx(BaseObject):
     """
     This class contains all elements of a sphinx documentation.
     It gets necessary attributes, can set default values for optional values and controls the generation of the documentation.
@@ -509,7 +510,7 @@ class Documentation_sphinx(BaseObject):
         self.write("- step 0 :")
         # 0. check input parameters
         if not self.check_input_parameters():
-            print '!!! ERROR: autorun aborted !!!'
+            print( '!!! ERROR: autorun aborted !!!')
             return
         
         self.write("- steps 1., 2.1, 2.2 :")
@@ -539,7 +540,7 @@ class Documentation_sphinx(BaseObject):
         self.write("- step 3. :")
         # 3. execute command line
         self.execute_command_line()
-        print "Delete:",self.delete
+        print( "Delete:",self.delete)
         if self.delete:
             self.write("- step 4. :")
             # 4. delete source-folder
@@ -547,25 +548,24 @@ class Documentation_sphinx(BaseObject):
             
             
         if self.output == "latex":  
-            self.adaptTEXdocument()
+            self.adapt_tex_document()
             
-            texfile = "%s.tex" %(self.project_name)
+            texfile = f"{self.project_name}.tex"
             cwd = os.getcwd()
             
             os.chdir(self.path_target)      # change path to include all *cls files
-            cmd = "%s %s" % (self.path_pdflatex,texfile)
+            cmd = f"{self.path_pdflatex} {texfile}"
 
-            for i in range(4):      # run pdflatex 3 times to have all links etc resolved
-                self.write("Execute command line: %s" % cmd)
+            for i in range(4):      # run pdflatex 3 times to have all links etc. resolved
+                self.write(f"Execute command line: {cmd}")
                 os.system(cmd)
             os.chdir(cwd)
     
-    def adaptTEXdocument(self):
+    def adapt_tex_document(self):
         """
         adapts the *.tex document to allow line breaks in code and to fix the longtables to the page width
         """
-        
-        texfile = "%s.tex" %(self.project_name)
+        texfile = f"{self.project_name}.tex"
         #
         texfile = os.path.join(self.path_target,texfile)
         #
@@ -583,13 +583,13 @@ class Documentation_sphinx(BaseObject):
                           
             elif "\\code{" in line: # adaptation to allow line breaks in code \nolinkurl{...}                    
                                    
-                count = line.count("\code{")                    
+                # count = line.count("\code{")
                 split = line.split("\code{")
                 
-                for sid, s in enumerate(split[1:]): # add additional } to first occurence of } from \code{..}
-                    for iter,letter in enumerate(s):
+                for sid, s in enumerate(split[1:]): # add additional } to first occurrence of } from \code{..}
+                    for it, letter in enumerate(s):
                         if letter == "}":                                
-                            split[sid+1] = s[:iter]+"}"+s[iter:]                               
+                            split[sid+1] = s[:it]+"}"+s[it:]
                             break
                 
                 line = "\\code{\\nolinkurl{".join(split)    # add \nolinkurl{ to \code{
@@ -647,7 +647,7 @@ class Documentation_sphinx(BaseObject):
             - Set default value (``./build/<output>/``) if ``None`` given
             - Get absolute path if necessary (``path_main/build/<output>/``)
         - Check ``self.path_doctree``
-            - Set to given value
+            - Set to  given value
             - Set default value (``./build/doctree/``) if ``True`` given
             - Get absolute path if necessary (``path_main/build/doctree/``)
         - Check ``self.files_py``
@@ -672,13 +672,13 @@ class Documentation_sphinx(BaseObject):
         
         # self.path_main: main path of the source-files to be documented
         if not self.path_main:
-            print '!!! ERROR: need main path where python source-code is !!!'
+            print( '!!! ERROR: need main path where python source-code is !!!')
             return False
         
         
         # self.project_name: name of the project to be documented
         if not self.project_name:
-            print '!!! ERROR: need project-name to document !!!'
+            print( '!!! ERROR: need project-name to document !!!')
             return False
         
         # check in pathes are relative pathes -> convert to absolute pathes
@@ -724,8 +724,8 @@ class Documentation_sphinx(BaseObject):
                 file_py = file_py[:-3]
             # - check if keys are in self.files.py
             if file_py not in self.files_py:
-                print '!!! ERROR: source-code file in exclusive member selection (files_py_members) !!!'
-                print '!!!        is not given in list of source-code files (files_py)              !!!'
+                print( '!!! ERROR: source-code file in exclusive member selection (files_py_members) !!!')
+                print( '!!!        is not given in list of source-code files (files_py)              !!!')
                 return False
             # - convert string values into lists
             if type(self.files_py_members[file_py]).__name__ == 'str':
@@ -747,7 +747,7 @@ class Documentation_sphinx(BaseObject):
             if i != len(self.files_rst)-1:
                 del self.files_rst[i]
                 self.files_rst.append('code')
-        except:
+        except Exception:
             self.files_rst.append('code')
 
         
@@ -761,19 +761,20 @@ class Documentation_sphinx(BaseObject):
         
         self.write("CHECKING finished")
         return True
-    
-    def _check_input_parameter_filelist(self, filelist, extension):
+
+    @staticmethod
+    def _check_input_parameter_filelist(filelist: str|list, extension:str):
         """
         Checks the input.
         """
-        l  =len(extension)
+        l = len(extension)
         
         # string given --> converted to list
         if type(filelist).__name__ == 'str':
             filelist = [filelist]
         
         # list given
-        if  type(filelist).__name__ == 'list':
+        if type(filelist).__name__ == 'list':
             
             for i,file in enumerate(filelist):
                 
@@ -785,15 +786,14 @@ class Documentation_sphinx(BaseObject):
                 
                 # - raise error if no string
                 else:
-                    print '!!! ERROR: need %s source-files as list of strings (for multiple files) !!!' % extension
+                    print (f"!!! ERROR: need {extension} source-files as list of strings (for multiple files) !!!")
                     return False
         
             return filelist
         
         else:
-            print '!!! ERROR: need %s source-files as string (one file) or list of strings (multiple files) !!!' % extension
+            print( f"!!! ERROR: need {extension} source-files as string (one file) or list of strings (multiple files) !!!" )
             return False
-
 
     def create_folder_structure(self):
         """
@@ -808,10 +808,10 @@ class Documentation_sphinx(BaseObject):
         self.op()
         
         # 1. create folder 'source'
-        self.write('create source-directory: %s' % self.path_source)
+        self.write(f"create source-directory: {self.path_source}")
         #~ cmd = 'mkdir %s' % adapt_string_for_dos(self.path_source)
-        cmd = 'mkdir %s' % (self.path_source)
-        print cmd
+        cmd = f"mkdir {self.path_source}"
+        print( cmd)
         os.system(cmd)
         
         
@@ -819,25 +819,25 @@ class Documentation_sphinx(BaseObject):
         self.write("in folder source")
 
         # 2.1. copy hereto folder '_static' with contents
-        self.write("2.1 copy hereto folder '_static' with contents from '%s'" % self.path_sphinx_patterns)
+        self.write("2.1 copy hereto folder '_static' with contents from '{self.path_sphinx_patterns}'")
         #~ os.system('xcopy %s %s /e /c /i /h /k /y' \
                    #~ % (adapt_string_for_dos(self.path_sphinx_patterns + '/_static'), \
                       #~ adapt_string_for_dos(self.path_source + '/_static')))
         src = os.path.join(self.path_sphinx_patterns,'_static')
         dst = os.path.join(self.path_source,'_static')       
-        print src
-        print dst
+        print(src)
+        print(dst)
         try:
             shutil.copytree(src,dst)
-        except OSError,e:
-            print e
+        except OSError as e:
+            print (e)
         
         
         # 2.2. create empty folder '_templates'
         self.write("create empty folder '_templates'")
         #~ cmd = 'mkdir %s' % adapt_string_for_dos(self.path_source + '/_templates')
         cmd = 'mkdir %s' % (os.path.join(self.path_source,'_templates'))        
-        print cmd
+        print( cmd)
         os.system(cmd)
         
         self.om()
@@ -849,9 +849,9 @@ class Documentation_sphinx(BaseObject):
         Options are taken from attributes which are set by ``self.__init__`` input variables 
         """
         
-        conf_py_file = Documentation_sphinx_conf_py_file(self.path_main, self.path_source, self.project_name, self.author,\
-                                                         self.version, self.release, self.master_doc, self.path_graphviz, \
-                                                         self.output,  self.o)
+        conf_py_file = DocumentationSphinxConfPyFile(self.path_main, self.path_source, self.project_name, self.author,
+                                                     self.version, self.release, self.master_doc, self.path_graphviz,
+                                                     self.output, self.o)
         conf_py_file.autorun()
     
     def write_file_code_rst(self):
@@ -861,8 +861,8 @@ class Documentation_sphinx(BaseObject):
         -> takes source-code files from ``self.files_py`` 
         """
         
-        code_rst_file = Documentation_sphinx_code_rst_file(self.project_name, self.path_source, self.code_rst_header, \
-                                                           self.files_py, self.files_py_members, self.graph,  self.o)
+        code_rst_file = DocumentationSphinxCodeRstFile(self.project_name, self.path_source, self.code_rst_header,
+                                                       self.files_py, self.files_py_members, self.graph, self.o)
         code_rst_file.autorun()
     
     def add_additional_files_rst(self):
@@ -926,22 +926,20 @@ class Documentation_sphinx(BaseObject):
         self.op()
         
         # - write basic command line
-        #~ cmd = 'python %s -b %s' % (adapt_string_for_dos(self.path_sphinx), self.output)        
-        #~ cmd = 'python %s -b %s' % (self.path_sphinx, self.output)
-        cmd = '%s -b %s' % (self.path_sphinx, self.output)
+        #~ cmd = f"python {adapt_string_for_dos(self.path_sphinx)} -b {self.output}"
+        #~ cmd = f"python {self.path_sphinx} -b {self.output]"
+        cmd = f"{self.path_sphinx} -b {self.output}"
         
         # add additional options
         # - set verbose flag
         if self.path_doctree:
-            #~ cmd = cmd + ' -d %s' % adapt_string_for_dos(self.path_doctree)
-            cmd = cmd + ' -d %s' % (self.path_doctree)
+            #~ cmd = cmd + f" -d {adapt_string_for_dos(self.path_doctree)}"
+            cmd = cmd + f" -d {self.path_doctree}"
         
         
         # add source and target destinations
-        #~ cmd = cmd + ' %s %s' % (adapt_string_for_dos(self.path_source), adapt_string_for_dos(self.path_target))
-        
-        
-        cmd = cmd + ' %s %s' % (self.path_source, self.path_target)
+        #~ cmd = cmd + f" {adapt_string_for_dos(self.path_source)} {adapt_string_for_dos(self.path_target)}"
+        cmd = cmd + f" {self.path_source} {self.path_target}"
         
         
         # write log file if desired
@@ -976,18 +974,16 @@ class Documentation_sphinx(BaseObject):
         self.op()
         
         # 2. delete source-folder
-        #~ cmd = 'rmdir /q /s %s' % adapt_string_for_dos(self.path_source)
-        cmd = 'rmdir %s' % (self.path_source)
+        #~ cmd = f"rmdir /q /s {adapt_string_for_dos(self.path_source)}"
+        # cmd = f"rmdir {self.path_source}"
         #~ print cmd
         #~ os.system(cmd)
         shutil.rmtree(self.path_source)
-        
-        
         self.om()
         self.write("DELETING finished")
     
     
-class Documentation_sphinx_conf_py_file(BaseObject):
+class DocumentationSphinxConfPyFile(BaseObject):
     """
     Class for the Sphinx configuration file *'conf.py'*.
     
@@ -1095,13 +1091,13 @@ class Documentation_sphinx_conf_py_file(BaseObject):
         self.open_file()
         
         self.write_header()
-        self.write_General_configuration()
+        self.write_general_configuration()
         if self.output in ['html', 'singlehtml']:
-            self.write_Options_for_HTML_output()
+            self.write_options_for_html_output()
         else:
-            self.write_Options_for_LaTeX_output()
-            self.write_Options_for_manual_page_output()
-            self.write_Options_for_Texinfo_output()
+            self.write_options_for_latex_output()
+            self.write_options_for_manual_page_output()
+            self.write_options_for_texinfo_output()
         
         self.close_file()
 
@@ -1153,7 +1149,7 @@ class Documentation_sphinx_conf_py_file(BaseObject):
         self.f.write("sys.path.append('%s')\n" % self.path_main)
         self.f.write("sys.path.append('%s')\n" % self.path_source)
     
-    def write_General_configuration(self):
+    def write_general_configuration(self):
         """
         Write *General configuration* in file ``self.path_source`` + *'/conf.py'*.
         File must be already opened with ``self.open_file()``
@@ -1168,9 +1164,9 @@ class Documentation_sphinx_conf_py_file(BaseObject):
         self.f.write("#needs_sphinx = '1.0'\n\n")
         self.f.write("# Add any Sphinx extension module names here, as strings. They can be extensions\n")
         self.f.write("# coming with Sphinx (named 'sphinx.ext.*') or your custom ones.\n")
-        self.f.write("extensions = ['sphinx.ext.autodoc', 'sphinx.ext.doctest', 'sphinx.ext.coverage'," \
-                                     "'sphinx.ext.pngmath', 'sphinx.ext.inheritance_diagram', 'sphinx.ext.autosummary',"\
-                                     "'sphinx.ext.todo']\n\n")
+        self.f.write("extensions = ['sphinx.ext.autodoc', 'sphinx.ext.doctest', 'sphinx.ext.coverage',"
+                     "'sphinx.ext.pngmath', 'sphinx.ext.inheritance_diagram', 'sphinx.ext.autosummary',"
+                     "'sphinx.ext.todo']\n\n")
         
         self.f.write("# Includes autosummary extension.\n")
         self.f.write("autosummary_generate = True\n\n")
@@ -1244,11 +1240,12 @@ class Documentation_sphinx_conf_py_file(BaseObject):
         self.f.write("# You may need to set this to a full path if dot is not in the executable search path.\n")
         
         if platform.system()  == "Windows": # Graphviz path adaptation
-            self.f.write("graphviz_dot='%s'\n" % (self.path_graphviz.replace('/','\\\\')))
+            graphviz_path = self.path_graphviz.replace('/','\\\\')
+            self.f.write(f"graphviz_dot='{graphviz_path}'\n")
         else:
-            self.f.write("graphviz_dot='%s'\n" % (self.path_graphviz))        
+            self.f.write(f"graphviz_dot='{self.path_graphviz}'\n")
     
-    def write_Options_for_HTML_output(self):
+    def write_options_for_html_output(self):
         """
         Write *Options for HTML output* in file ``self.path_source`` + *'/conf.py'*.
         File must be already opened with ``self.open_file()``
@@ -1282,7 +1279,7 @@ class Documentation_sphinx_conf_py_file(BaseObject):
 
         self.f.write("# The name of an image file (relative to this directory) to place at the top\n")
         self.f.write("# of the sidebar.\n")
-        self.f.write("html_logo = '%s'\n\n" % (os.path.abspath("./_static/%s" % (IFL_LOGO_html))))
+        self.f.write(f"html_logo = '{os.path.abspath(f"./_static/{IFL_LOGO_HTML}")}'\n\n")
 
         self.f.write("# The name of an image file (within the static path) to use as favicon of the\n")
         self.f.write("# docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32\n")
@@ -1336,9 +1333,9 @@ class Documentation_sphinx_conf_py_file(BaseObject):
         self.f.write("#html_file_suffix = None\n\n")
 
         self.f.write("# Output file base name for HTML help builder.\n")
-        self.f.write("htmlhelp_basename = '%s_doc'\n" % self.project_name)
+        self.f.write(f"htmlhelp_basename = '{self.project_name}s_doc'\n")
     
-    def write_Options_for_LaTeX_output(self):
+    def write_options_for_latex_output(self):
         """
         Write *Options for LaTeX output* in file ``self.path_source`` + *'/conf.py'*.
         File must be already opened with ``self.open_file()``
@@ -1364,14 +1361,14 @@ class Documentation_sphinx_conf_py_file(BaseObject):
         self.f.write("latex_documents = [\n")
         # im zweiten String ist eigentlich im original vor dem unterstrich ein '\\' eingefuegt. notwendig?
         self.f.write("# ! WARNUNG: im zweiten String ist eigentlich im original vor einem unterstrich ein '\\' eingefuegt. notwendig? !\n")
-        self.f.write("    ('%s', '%s.tex', u'%s Documentation',\n" % (self.master_doc, self.project_name,self.project_name))
-        self.f.write("     u'%s', 'manual'),\n" % self.author)
+        self.f.write(f"    ('{self.master_doc}', '{self.project_name}.tex', u'{self.project_name} Documentation',\n")
+        self.f.write(f"     u'{self.author}', 'manual'),\n")
         self.f.write("]\n\n")
 
         self.f.write("# The name of an image file (relative to this directory) to place at the top of\n")
         self.f.write("# the title page.\n")
         #~ self.f.write("#latex_logo = None\n\n")        
-        self.f.write("latex_logo = '%s' \n\n" % (os.path.abspath("./_static/%s" % (IFL_LOGO_pdf))))
+        self.f.write(f"latex_logo = '{os.path.abspath(f"./_static/{IFL_LOGO_PDF}")}' \n\n")
         #~ 2010_Logo_IFL.png
 
         self.f.write('# For "manual" documents, if this is true, then toplevel headings are parts,\n')
@@ -1392,7 +1389,7 @@ class Documentation_sphinx_conf_py_file(BaseObject):
         self.f.write("# If false, no module index is generated.\n")
         self.f.write("#latex_domain_indices = True\n")
             
-    def write_Options_for_manual_page_output(self):
+    def write_options_for_manual_page_output(self):
         """
         Write *Options for manual page output* in file ``self.path_source`` + *'/conf.py'*.
         File must be already opened with ``self.open_file()``
@@ -1406,14 +1403,14 @@ class Documentation_sphinx_conf_py_file(BaseObject):
         self.f.write("# One entry per manual page. List of tuples\n")
         self.f.write("# (source start file, name, description, authors, manual section).\n")
         self.f.write("man_pages = [\n")
-        self.f.write("    ('%s', '%s', u'%s Documentation',\n" % (self.master_doc, self.project_name, self.project_name))
+        self.f.write(f"    ('{self.master_doc}', '{self.project_name}.tex', u'{self.project_name} Documentation',\n")
         self.f.write("     [u'SL'], 1)\n")
         self.f.write("]\n")
 
         self.f.write("# If true, show URL addresses after external links.\n")
         self.f.write("#man_show_urls = False\n")
     
-    def write_Options_for_Texinfo_output(self): 
+    def write_options_for_texinfo_output(self):
         """
         Write *Options for Texinfo output* in file ``self.path_source`` + *'/conf.py'*.
         File must be already opened with ``self.open_file()``
@@ -1428,8 +1425,8 @@ class Documentation_sphinx_conf_py_file(BaseObject):
         self.f.write("# (source start file, target name, title, author,\n")
         self.f.write("#  dir menu entry, description, category)\n")
         self.f.write("texinfo_documents = [\n")
-        self.f.write("  ('%s', '%s', u'%s Documentation',\n" % (self.master_doc, self.project_name, self.project_name))
-        self.f.write("   u'%s', '%s', 'One line description of project.',\n" % (self.author, self.project_name))
+        self.f.write(f"    ('{self.master_doc}', '{self.project_name}.tex', u'{self.project_name} Documentation',\n")
+        self.f.write(f"   u'{self.author}', '{self.project_name}', 'One line description of project.',\n")
         self.f.write("   'Miscellaneous'),\n")
         self.f.write("]\n\n")
 
@@ -1446,7 +1443,7 @@ class Documentation_sphinx_conf_py_file(BaseObject):
         self.f.write("#texinfo_no_detailmenu = False\n\n")
         
 
-class Documentation_sphinx_code_rst_file(BaseObject):
+class DocumentationSphinxCodeRstFile(BaseObject):
     """
     Class for the Sphinx code documentation file *'code.rst'*.
     
@@ -1522,7 +1519,7 @@ class Documentation_sphinx_code_rst_file(BaseObject):
         for python_file in self.files_py:
             self.write_headline(python_file)
             if self.graph:
-                self.write_ineritance_diagram(python_file)
+                self.write_inheritance_diagram(python_file)
             self.write_summary(python_file)
             self.write_documentation(python_file)
         
@@ -1549,13 +1546,13 @@ class Documentation_sphinx_code_rst_file(BaseObject):
         File must be already opened with ``self.open_file()``
         """
         
-        self.f.write("%s\n" % self.project_name)
+        self.f.write(f"{self.project_name}\n")
         
         l = len(self.project_name)
-        self.f.write("%s\n\n" % (l*'='))
+        self.f.write(f"{l*'='}\n\n")
         
         if self.code_rst_header:
-            self.f.write("%s\n\n\n" % self.code_rst_header)
+            self.f.write(f"{self.code_rst_header}\n\n\n")
     
     def write_headline(self,python_file):
         """
@@ -1563,12 +1560,12 @@ class Documentation_sphinx_code_rst_file(BaseObject):
         File must be already opened with ``self.open_file()``
         """
         
-        self.f.write("Module %s\n" % python_file)
+        self.f.write(f"Module {python_file}\n")
         
         l = len(python_file)
-        self.f.write("%s\n\n" % ((7+l)*'"'))
+        self.f.write(f"{(7+l)*'"'}\n\n")
     
-    def write_ineritance_diagram(self,python_file):
+    def write_inheritance_diagram(self, python_file):
         """
         Write *inheritance diagram* in file ``self.path_source`` + *'/code.rst'*.
         File must be already opened with ``self.open_file()``
@@ -1578,12 +1575,8 @@ class Documentation_sphinx_code_rst_file(BaseObject):
         
         
         """
-        
         self.f.write("Inheritance diagram\n###################\n\n")
-        #~ self.f.write(".. xmodule::  %s\n\n" % python_file)
-        
-         
-         
+        #~ self.f.write(".. xmodule::  %s\n\
         self.f.write(".. inheritance-diagram::  %s\n\n" % python_file)
         self.f.write("---------\n\n")
     
@@ -1662,86 +1655,80 @@ class Documentation_sphinx_code_rst_file(BaseObject):
         import inspect        
         module = __import__(str(python_file))
         
-        classDict = {}
-        functionList = []
+        class_dict = {}
+        function_list = []
         
         for name, obj in inspect.getmembers(module):
             if inspect.isclass(obj):
                 #~ print "We have a class:",obj
                 if str(obj).startswith(str(python_file)):
-                    print '#'*40
-                    print '--Class "%s" is of our module "%s".' % (obj,python_file)
+                    print ('#'*40)
+                    print ('--Class "%s" is of our module "%s".' % (obj,python_file))
                     
                     classtree = inspect.getclasstree([obj])
-                    print "classtree",classtree
-                    for classObj in classtree:
-                        print '-',classObj
+                    print ("classtree",classtree)
+                    for class_obj in classtree:
+                        print( '-',class_obj)
                         
-                        if isinstance(classObj,list):
-                            classObj = classObj[0]
-                        if classObj[0] not in classDict:
-                            classDict[classObj[0]] = []
-                        memberdictionary = classObj[0].__dict__
-                        print classObj[0],"dict",memberdictionary
+                        if isinstance(class_obj,list):
+                            class_obj = class_obj[0]
+                        if class_obj[0] not in class_dict:
+                            class_dict[class_obj[0]] = []
+                        memberdictionary = class_obj[0].__dict__
+                        print (class_obj[0],"dict",memberdictionary)
                         
                         for member in memberdictionary:
-                            print member
-                            if member not in classDict[classObj[0]]:
+                            print( member)
+                            if member not in class_dict[class_obj[0]]:
                                 
-                                classDict[classObj[0]].append(member)
+                                class_dict[class_obj[0]].append(member)
                     
                     
             if inspect.ismethod(obj):
-                print '--METHOD',obj
+                print( '--METHOD',obj)
                 
             if inspect.isfunction(obj):
-                print '--FUNCTION',obj                
-                functionList.append(str(obj).split()[1])
+                print( '--FUNCTION',obj                )
+                function_list.append(str(obj).split()[1])
         
         
         
         self.f.write("Summary\n#########\n\n")
         self.f.write(".. currentmodule::  %s\n\n" % python_file)
         # members here
-        if len(classDict)>0: 
+        if len(class_dict)>0:
             self.f.write("Classes and members\n*******************\n\n")        
             
             self.f.write(".. autosummary::\n")
             self.f.write("   :toctree:\n\n")        
-            for className in classDict:
+            for class_name in class_dict:
                 try:
-                    modulename = className.split('.')[0]
-                    classNameWOmodlue = str(className).split(modulename+".")[1]
-                except Exception,e:
-                    print e
-                    classNameWOmodlue = str(className)
-                self.f.write("   %s\n"%(classNameWOmodlue))
-                memberList = classDict[className]
-                for member in sorted(memberList):
+                    modulename = class_name.split('.')[0]
+                    class_name_wo_module = str(class_name).split(modulename+".")[1]
+                except Exception as e:
+                    print (e)
+                    class_name_wo_module = str(class_name)
+                self.f.write(f"   {class_name_wo_module}\n")
+                member_list = class_dict[class_name]
+                for member in sorted(member_list):
                     if not member.startswith("__doc__"): #skip the __doc__ member
-                        self.f.write("   %s\n"%('.'.join([classNameWOmodlue,member])))
+                        joined_string = '.'.join([class_name_wo_module,member])
+                        self.f.write(f"   {joined_string}\n")
         
         self.f.write("\n")
         
         # functions here
-        if len(functionList)>0:           
+        if len(function_list)>0:
             self.f.write("Module functions\n*******************\n\n")        
             self.f.write(".. autosummary::\n")
             self.f.write("   :toctree:\n\n")            
-            for function in functionList:
-                self.f.write("   %s\n"%(function))
+            for function in function_list:
+                self.f.write(f"   {function}\n")
         
         self.f.write("\n")
         #~ self.f.write("---------\n\n")
         
         return
-        #~ old code:
-        
-        self.f.write("Summary\n\n")
-        self.f.write(".. autosummary::  %s\n" % python_file)
-        #self.f.write("    :toctree:\n\n")
-        self.f.write("\n")
-        #~ self.f.write("---------\n\n")
     
     def write_documentation(self,python_file):
         """
