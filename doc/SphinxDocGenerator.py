@@ -47,7 +47,7 @@ Sphinx Documentation Generator
 import os,sys, time, shutil	
 import pickle as p
 import platform         # for platform checks WIN/UNIX
-
+from pathlib import Path
 import sphinx		# for version checks
 sphinx_version = sphinx.__version__
 print(f"-Using Sphinx version {sphinx_version}")
@@ -84,7 +84,8 @@ def main():
     # outputs=['html', 'latex','dirhtml', 'singlehtml','epub', 'text','man', 'texinfo']    # list of output formats
     # outputs=['html','singlehtml', 'latex']
     # outputs=['text','man','texinfo']
-    outputs=['latex']
+    # outputs=['latex']
+    outputs=['html']
     #
     # ###############
     # DOCUMENTATION SETTINGS
@@ -119,8 +120,8 @@ def main():
         path_pdflatex='/usr/bin/pdflatex'           # which pdflatex (only necessary if latex in outputs)
        
     elif platform.system()  == "Windows":
-        path_sphinx='C:/Python26/Scripts/sphinx-build.exe'    # which sphinx-build        
-        path_graphviz='C:/Graphviz2.32/bin/dot.exe'           # which dot        
+        path_sphinx=r'./../.venv/Scripts/sphinx-build.exe'    # which sphinx-build
+        path_graphviz=r'./../.venv/Scripts/Graphviz-13.1.2-win64/bin/dot.exe'           # which dot
         path_pdflatex='C:/MiKTeX 2.9/miktex/bin/pdflatex'      # which pdflatex (only necessary if latex in outputs)
                 
     else: 
@@ -262,15 +263,7 @@ class BaseObject:
         
         :param string: String which will be printed
         :type string: string
-        
-        Example::
-            
-            >>> foo.write("SAVING started")
-            SAVING started
-            >>> foo.op()
-            >>> foo.write("Save under './test.pck'")
-              Save under './test.pck'
-        
+
         """
         
         print( self.o*self.b, string)
@@ -584,7 +577,7 @@ class DocumentationSphinx(BaseObject):
             elif "\\code{" in line: # adaptation to allow line breaks in code \nolinkurl{...}                    
                                    
                 # count = line.count("\code{")
-                split = line.split("\code{")
+                split = line.split(r"\code{")
                 
                 for sid, s in enumerate(split[1:]): # add additional } to first occurrence of } from \code{..}
                     for it, letter in enumerate(s):
@@ -629,10 +622,8 @@ class DocumentationSphinx(BaseObject):
             #~ path_absolute = convert_path_relative2absolute(self.path_main, path_relative)            
             path_absolute = os.path.abspath(path_relative)
         
-        return path_absolute
-    
-    
-    
+        return Path(path_absolute).as_posix()
+
     def check_input_parameters(self):
         """
         Check and adapt input parameters:
@@ -695,7 +686,7 @@ class DocumentationSphinx(BaseObject):
             self.path_target = './build/'+self.output
         if self.path_target:
             #~ self.path_target = convert_path_relative2absolute(self.path_main, self.path_target)
-            self.path_target = os.path.abspath(self.path_target)
+            self.path_target = Path(os.path.abspath(self.path_target)).as_posix()
         
         
         # self.path_doctree: path of the doctree-files
@@ -703,7 +694,7 @@ class DocumentationSphinx(BaseObject):
             if self.path_doctree == True:
                 self.path_doctree = './build/doctree'
             #~ self.path_doctree = convert_path_relative2absolute(self.path_main, self.path_doctree)
-            self.path_doctree = os.path.abspath(self.path_doctree)
+            self.path_doctree = Path(os.path.abspath(self.path_doctree)).as_posix()
         
         # self.files_py: python source-files to be documented
         # - check if list and all members are strings and no file-extensions
@@ -810,11 +801,13 @@ class DocumentationSphinx(BaseObject):
         # 1. create folder 'source'
         self.write(f"create source-directory: {self.path_source}")
         #~ cmd = 'mkdir %s' % adapt_string_for_dos(self.path_source)
-        cmd = f"mkdir {self.path_source}"
+        cmd = f"mkdir {Path(self.path_source)}"
         print( cmd)
-        os.system(cmd)
-        
-        
+        try:
+            os.system(cmd)
+        except Exception as e:
+            print(e)
+
         # 2. in folder source
         self.write("in folder source")
 
@@ -836,7 +829,7 @@ class DocumentationSphinx(BaseObject):
         # 2.2. create empty folder '_templates'
         self.write("create empty folder '_templates'")
         #~ cmd = 'mkdir %s' % adapt_string_for_dos(self.path_source + '/_templates')
-        cmd = 'mkdir %s' % (os.path.join(self.path_source,'_templates'))        
+        cmd = 'mkdir %s' % (os.path.join(Path(self.path_source),'_templates'))
         print( cmd)
         os.system(cmd)
         
@@ -928,7 +921,7 @@ class DocumentationSphinx(BaseObject):
         # - write basic command line
         #~ cmd = f"python {adapt_string_for_dos(self.path_sphinx)} -b {self.output}"
         #~ cmd = f"python {self.path_sphinx} -b {self.output]"
-        cmd = f"{self.path_sphinx} -b {self.output}"
+        cmd = f"{Path(self.path_sphinx).absolute()} -b {self.output}"
         
         # add additional options
         # - set verbose flag
@@ -960,7 +953,7 @@ class DocumentationSphinx(BaseObject):
         #   python "C:\Program Files (x86)\sphinx\sphinx-build.py" <flag_x> <flagvalue_x> <source> <target>
         
         self.write("Execute command line: %s" % cmd)
-        #~ ss
+        #
         os.system(cmd)
         
         self.om()
@@ -1165,7 +1158,7 @@ class DocumentationSphinxConfPyFile(BaseObject):
         self.f.write("# Add any Sphinx extension module names here, as strings. They can be extensions\n")
         self.f.write("# coming with Sphinx (named 'sphinx.ext.*') or your custom ones.\n")
         self.f.write("extensions = ['sphinx.ext.autodoc', 'sphinx.ext.doctest', 'sphinx.ext.coverage',"
-                     "'sphinx.ext.pngmath', 'sphinx.ext.inheritance_diagram', 'sphinx.ext.autosummary',"
+                     "'sphinx.ext.imgmath', 'sphinx.ext.inheritance_diagram', 'sphinx.ext.autosummary',"
                      "'sphinx.ext.todo']\n\n")
         
         self.f.write("# Includes autosummary extension.\n")
@@ -1240,7 +1233,8 @@ class DocumentationSphinxConfPyFile(BaseObject):
         self.f.write("# You may need to set this to a full path if dot is not in the executable search path.\n")
         
         if platform.system()  == "Windows": # Graphviz path adaptation
-            graphviz_path = self.path_graphviz.replace('/','\\\\')
+            # graphviz_path = self.path_graphviz.replace('/','\\\\')
+            graphviz_path = self.path_graphviz
             self.f.write(f"graphviz_dot='{graphviz_path}'\n")
         else:
             self.f.write(f"graphviz_dot='{self.path_graphviz}'\n")
@@ -1279,7 +1273,7 @@ class DocumentationSphinxConfPyFile(BaseObject):
 
         self.f.write("# The name of an image file (relative to this directory) to place at the top\n")
         self.f.write("# of the sidebar.\n")
-        self.f.write(f"html_logo = '{os.path.abspath(f"./_static/{IFL_LOGO_HTML}")}'\n\n")
+        self.f.write(f"html_logo = '{Path(os.path.abspath(f"./_static/{IFL_LOGO_HTML}")).as_posix()}'\n\n")
 
         self.f.write("# The name of an image file (within the static path) to use as favicon of the\n")
         self.f.write("# docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32\n")
@@ -1353,7 +1347,7 @@ class DocumentationSphinxConfPyFile(BaseObject):
         self.f.write("#'pointsize': '10pt',\n\n")
         self.f.write("# Additional stuff for the LaTeX preamble.\n")
         self.f.write("#'preamble': '',\n")
-        self.f.write("'footer': 'Institute of Aircraft Design \& Lightweight Structures (IFL), Technische Universitaet Braunschweig',\n")
+        self.f.write(r"'footer': 'Institute of Aircraft Design \& Lightweight Structures (IFL), Technische Universitaet Braunschweig',\n")
         self.f.write("}\n\n")
 
         self.f.write("# Grouping the document tree into LaTeX files. List of tuples\n")

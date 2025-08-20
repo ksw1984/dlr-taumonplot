@@ -6,7 +6,7 @@ Manual
 Starting taumonplot
 ..........................
 
-- run the python script directly in a Text editor (F5 in SciTE)
+- run the python script directly in a Text editor (F5 in SciTE) or IDE
 - run the python script from a terminal ``python  taumonplot_v2-04.py``
 - run the function ``create_plot(...)`` of the module ``taumonplot_v2-04`` in another script
 - `Monitoring data on a cluster`: 
@@ -22,7 +22,7 @@ GUI
 GUI overview
 ----------------------
    
-.. figure:: ../images/v204/GUI.png    
+.. figure:: ../images/v204/GUI.png
     :scale: 75 %  
     :align: center   
     :alt: alternate text
@@ -312,7 +312,7 @@ This button opens another windows which contains the plot options for the variab
 
 
 +-----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-|Label sizes                        |Font size of the tickers, legend and axes Either a relative value of 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large' or an absolute font size, e.g., 12                                      |
+|Label sizes                        |Font size of the tickers, legend and axes Either a relative value of 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large' or an absolute font size, e.g., 12                                              |
 +-----------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 +-----------------------------------+--------------------------------------------------------------------------------+

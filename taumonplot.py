@@ -2684,12 +2684,13 @@ def ascii_read(filename,
     This ascii_read a wrapper for loadtxt
     
     DEV:
-            TO-DO
-                - Add mutiple Title pulls, for many columns
-                - Allow only string cols
-                - Improve logical flow of program (reduce if statements, esp if string_cols:)
-                -Include support for open file object
-    
+        TO-DO
+
+        - Add mutiple Title pulls, for many columns
+        - Allow only string cols
+        - Improve logical flow of program (reduce if statements, esp if string_cols:)
+        - Include support for open file object
+
     .. Note:        
         Modified on 2012.03.14 for TAU monitoring files
         Kay Sommerwerk
