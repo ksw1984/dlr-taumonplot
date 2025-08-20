@@ -567,7 +567,7 @@ class PlotCreator:
         
    
         
-        for key in self.plot_options_dict.keys():
+        for key in list(self.plot_options_dict.keys()):
             
             if key not in y_variable_list_plot and key not in ["X-Var","ticker_size","legend_size","xaxis_size","yaxis_size"]:
                 self.plot_options_dict.pop(key, None)
@@ -1012,9 +1012,9 @@ class PlotCreator:
             #
         #
         #~ IFL text
-        fig.text(0.01, 0.015, "IFL-TU Braunschweig",
-                        fontsize='small', color='black',
-                        alpha=0.3)
+        # fig.text(0.01, 0.015, "IFL-TU Braunschweig",
+        #                 fontsize='small', color='black',
+        #                 alpha=0.3)
         #
     #
 #
