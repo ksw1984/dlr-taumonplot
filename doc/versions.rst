@@ -8,6 +8,7 @@ Version table
 ==============  ==================  ============================================================================
 version         date                changes
 ==============  ==================  ============================================================================
+3.00            20.08.2025          update taumonplot to Python 3.X
 2.05            17.02.2014          subplot border distance adjustment in plot options
 2.04            17.02.2014          major: added plot options, direct manipulation of plot lines, axis, legend
 2.03            14.02.2014          changed title, subgrid, lin/log buttons to checkbuttons

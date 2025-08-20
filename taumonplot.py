@@ -115,6 +115,7 @@ y_variable_list = [ 'Residual',
 #                       version 2.03, 14.02.2014        # changed title, subgrid, lin/log buttons to checkbuttons
 #                       version 2.04, 17.02.2014        # major: added plot options via a plot options menu. allows direct manipulation of plot lines, axis and legend
 #                       version 2.05, 17.02.2014        # subplot border distance adjustment in plot options
+#                       version 3.00, 20.08.2025        # update taumonplot to Python 3.X
 #--------------------------------------------------------------------------
 # ToDo 
 #--------------------------------------------------------------------------
@@ -221,12 +222,12 @@ import sys
 import time
 from typing import Literal
 from pathlib import Path
-# numpy > 1.6.1
+# numpy
 import numpy as np
 def is_string_like(obj):
     """Return True if obj is string-like (filename/path)."""
     return isinstance(obj, (str, bytes, Path, np.str_, np.bytes_))
-# matplotlib > 0.99.1
+# matplotlib
 import pylab
 from matplotlib.font_manager import FontProperties
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
@@ -731,7 +732,7 @@ class PlotCreator:
                     #
                 #
             else:
-                sys.exit("WARNING : Y-Variable %s not found in TAU monitoring file. Process interrupted. \n Check 'data_line' and 'title_line'" % variable)                
+                sys.exit(f"WARNING : Y-Variable {variable} not found in TAU monitoring file. Process interrupted. \n Check 'data_line' and 'title_line'")
                 #
             #
         col_labels.append('mean of last '+str(int(self.table_entry_val))+' iter: '+str(int(self.max_entry_val_disp-value_dict[x_variable_list_plot[0]][0]-self.table_entry_val))+'-'+str(int(self.max_entry_val_disp-value_dict[x_variable_list_plot[0]][0])) )
@@ -2765,8 +2766,7 @@ def ascii_read(filename,
         ndata = np.loadtxt(f, **loadtxt_args)
     except ValueError as Err:
         raise ValueError(
-        "Conversion Error in loadtxt:[%s], have you specified string_cols?"
-        %Err)
+        f"Conversion Error in loadtxt:[{Err}], have you specified string_cols?")
     
     #Read in string data
     if string_cols:
